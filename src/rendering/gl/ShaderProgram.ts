@@ -28,6 +28,7 @@ class ShaderProgram {
   unifEye: WebGLUniformLocation;
   unifUp: WebGLUniformLocation;
   unifDimensions: WebGLUniformLocation;
+  unifResolution: WebGLUniformLocation;
   unifTime: WebGLUniformLocation;
 
   constructor(shaders: Array<Shader>) {
@@ -47,6 +48,7 @@ class ShaderProgram {
     this.unifUp   = gl.getUniformLocation(this.prog, "u_Up");
     this.unifDimensions   = gl.getUniformLocation(this.prog, "u_Dimensions");
     this.unifTime   = gl.getUniformLocation(this.prog, "u_Time");
+    this.unifResolution = gl.getUniformLocation(this.prog, "iResolution");
   }
 
   use() {
@@ -74,6 +76,14 @@ class ShaderProgram {
     if(this.unifDimensions !== -1) {
       gl.uniform2f(this.unifDimensions, width, height);
     }
+  }
+
+  setResolution(width: number, height: number) {
+    this.use();
+    if(this.unifResolution !== -1) {
+      gl.uniform2f(this.unifResolution, width, height);
+    }
+
   }
 
   setTime(t: number) {
