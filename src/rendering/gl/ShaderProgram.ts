@@ -27,7 +27,6 @@ class ShaderProgram {
   unifRef: WebGLUniformLocation;
   unifEye: WebGLUniformLocation;
   unifUp: WebGLUniformLocation;
-  unifDimensions: WebGLUniformLocation;
   unifResolution: WebGLUniformLocation;
   unifTime: WebGLUniformLocation;
 
@@ -46,8 +45,7 @@ class ShaderProgram {
     this.unifEye   = gl.getUniformLocation(this.prog, "u_Eye");
     this.unifRef   = gl.getUniformLocation(this.prog, "u_Ref");
     this.unifUp   = gl.getUniformLocation(this.prog, "u_Up");
-    this.unifDimensions   = gl.getUniformLocation(this.prog, "u_Dimensions");
-    this.unifTime   = gl.getUniformLocation(this.prog, "u_Time");
+    this.unifTime   = gl.getUniformLocation(this.prog, "iTime");
     this.unifResolution = gl.getUniformLocation(this.prog, "iResolution");
   }
 
@@ -71,17 +69,11 @@ class ShaderProgram {
     }
   }
 
-  setDimensions(width: number, height: number) {
-    this.use();
-    if(this.unifDimensions !== -1) {
-      gl.uniform2f(this.unifDimensions, width, height);
-    }
-  }
 
   setResolution(width: number, height: number) {
     this.use();
     if(this.unifResolution !== -1) {
-      gl.uniform2f(this.unifResolution, width, height);
+      gl.uniform3f(this.unifResolution, width, height, 1.0);
     }
 
   }

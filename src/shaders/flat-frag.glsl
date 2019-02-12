@@ -1,9 +1,7 @@
 #version 300 es
 precision highp float;
 
-uniform vec2 u_Dimensions;
-uniform float u_Time;
-uniform vec3 iResolution;           // viewport resolution (in pixels)
+uniform vec3      iResolution;           // viewport resolution (in pixels)
 uniform float     iTime;                 // shader playback time (in seconds)
 uniform float     iTimeDelta;            // render time (in seconds)
 uniform int       iFrame;                // shader playback frame
@@ -23,8 +21,8 @@ const int numObjects = 1;
 
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
 vec3 v3Ref = vec3(0.0, 0.0, 0.0);
-vec3 v3Eye = vec3(0.0, 0.0, -10.0);
-vec3 v3ScreenPos;
+vec3 v3Eye = vec3(0.0, 0.0, -1.5);
+vec2 v2ScreenPos;
 
 struct sdfParams {
     int sdfType;
@@ -88,13 +86,13 @@ vec3 getRay(vec3 up, vec3 eye, vec3 ref, float aspect, vec2 screenPos) {
 
 }
 
-vec3 getNormalFromRays(sdfParams params) {
-    float aspect = u_Dimensions.x / u_Dimensions.y;
+vec3 getNormalFromRays(sdfParams params, vec2 fragCoord) {
+    float aspect = iResolution.x / iResolution.y;
     //calculate the points for 4 surrounding rays
-    vec3 ray1 = getRay(v3Up, v3Eye, v3Ref, aspect, fs_Pos + vec2(-0.001,  0.0));
-    vec3 ray2 = getRay(v3Up, v3Eye, v3Ref, aspect, fs_Pos + vec2( 0.001,  0.0));
-    vec3 ray3 = getRay(v3Up, v3Eye, v3Ref, aspect, fs_Pos + vec2( 0.00, -0.001));
-    vec3 ray4 = getRay(v3Up, v3Eye, v3Ref, aspect, fs_Pos + vec2( 0.00,  0.001));
+    vec3 ray1 = getRay(v3Up, v3Eye, v3Ref, aspect, fragCoord + vec2(-0.001,  0.0));
+    vec3 ray2 = getRay(v3Up, v3Eye, v3Ref, aspect, fragCoord + vec2( 0.001,  0.0));
+    vec3 ray3 = getRay(v3Up, v3Eye, v3Ref, aspect, fragCoord + vec2( 0.00, -0.001));
+    vec3 ray4 = getRay(v3Up, v3Eye, v3Ref, aspect, fragCoord + vec2( 0.00,  0.001));
 
     float t1 =  rayMarch(params, ray1, 100, 100.0);
     float t2 =  rayMarch(params, ray2, 100, 100.0);
@@ -109,15 +107,33 @@ vec3 getNormalFromRays(sdfParams params) {
     return normalize(cross(p4-p3, p1-p2));
 }
 
-vec3 getNormal(sdfParams params, vec3 point) {
+vec3 getNormal(sdfParams params, vec3 point, vec2 fragCoord) {
     switch(params.sdfType) {
         case 0: return sphereNormal            (params, point);
-        default: return getNormalFromRays      (params);
+        default: return getNormalFromRays      (params, fragCoord);
     }
     return vec3(0.0, 0.1, 0.0);
 }
 
-vec4 getTextureColor(sdfParams params, vec3 point) {
+vec4 getPatternPoint(vec3 point, vec3 center) {
+    float g = 300.0;
+    float dist = (0.5 - length(point.xy)) * 3.0;
+    mat3 rot = mat3(cos(-dist), -sin(-dist), 0.0,
+                    sin(-dist), cos(dist),  0.0,
+                    0.0,       0.0,        1.0);
+    vec3 p = normalize(point - center);
+    p = rot * p;
+
+    if(
+       sin(p.y * g) < 0.1
+       && cos(p.x * g) < 0.1
+       && p.z < -0.98
+    ) return vec4(1.0, 1.0, 0.0, 1.0);
+
+    return vec4(1.0, 0.0, 0.0, 1.0);
+}
+
+vec4 getTextureColor(sdfParams params, vec3 point, vec2 fragCoord) {
     vec3 normal;
     vec3 lightDirection = normalize(sunPosition - point);
     float intensity;
@@ -125,9 +141,10 @@ vec4 getTextureColor(sdfParams params, vec3 point) {
     switch(params.sdfType) {
         ///flat lambert
         case 0:
-            normal = getNormal(params, point);
+            normal = getNormal(params, point, fragCoord);
             intensity = dot(normal, lightDirection) * 0.9;
-            return vec4(params.color * intensity, 1.0);
+            return getPatternPoint(point, params.center);
+            //return vec4(params.color * intensity, 1.0);
     }
     return vec4(params.color, 1.0);
 }
@@ -140,13 +157,13 @@ void initSdfs() {
 
     sdfs[0].sdfType = 0;
     sdfs[0].center = vec3(0,0,0);
-    sdfs[0].radius = 1.5;
+    sdfs[0].radius = 1.0;
     sdfs[0].color = vec3(0.0, 0.0, 1.0);
 
 }
 
 vec2 pixelToScreenPos(vec2 pixelPos) {
-    return (2.0 * pixelPos / iResolution.xy) - vec2(1.0);
+    return (2.0 * vec2(pixelPos.x / iResolution.x, pixelPos.y/iResolution.y)) - vec2(1.0);
 }
 
 vec2 screenToPixelPos(vec2 pixelPos) {
@@ -154,29 +171,34 @@ vec2 screenToPixelPos(vec2 pixelPos) {
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-    fragColor = vec4(0.5 * (fs_Pos + vec2(1.0)), 0.5 * (sin(u_Time * 3.14159 * 0.01) + 1.0), 1.0);
+    fragColor = vec4(0.0, 0.0, 0.0, 1.0);
 
+    v2ScreenPos = pixelToScreenPos(fragCoord);
     //set up
     initSdfs();
-    vec3 ray = getRay(v3Up, v3Eye, v3Ref, u_Dimensions.x/u_Dimensions.y, fs_Pos) ;
+    vec3 ray= getRay(v3Up, v3Eye, v3Ref, iResolution.x/iResolution.y, v2ScreenPos) ;
 
     float maxT = 100.0;
     int maxIterations = 100;
     float t;
 
      for(int i = 0; i < numObjects; i++) {
-        t = rayMarch(sdfs[i], ray, maxIterations, maxT);
-        if( t < maxT) {
-            //get the diffuse term
-            fragColor = getTextureColor(sdfs[i], v3Eye + ray*t);
-            maxT = t;
+        if(sdfs[i].sdfType > -1) {
+            t = rayMarch(sdfs[i], ray, maxIterations, maxT);
+            if( t < maxT) {
+                //get the diffuse term
+                fragColor = getTextureColor(sdfs[i], v3Eye + ray*t, v2ScreenPos);
+                maxT = t;
+            }
+
         }
     }
+
 }
 
 void main() {
     //need to convert to pixel dimesions
     vec2 fragCoord = screenToPixelPos(fs_Pos);
-    mainImage(out_Col, fs_Pos);
+    mainImage(out_Col, fragCoord);
 }
 
