@@ -35,11 +35,7 @@ struct sdfParams {
 
 sdfParams sdfs[numObjects];
 
-float hemisphere(sdfParams params, vec3 point) {
-    return -point.z-0.94;
-}
-
-float seedsSDF(sdfParams params, vec3 point) {
+float seedHeightOffset(sdfParams params, vec3 point) {
     vec3 p = point - params.center;
 
     float g = 200.0;
@@ -48,7 +44,16 @@ float seedsSDF(sdfParams params, vec3 point) {
                     sin(-dist), cos(dist),  0.0,
                     0.0,       0.0,        1.0);
     p = rot * p;
-    float height = (2.0 + sin(p.y * g)+cos(p.x * g)) / 100.0;
+    return (2.0 + sin(p.y * g)+cos(p.x * g))/4.0;
+}
+float hemisphere(sdfParams params, vec3 point) {
+    return -point.z-0.94;
+}
+
+float seedsSDF(sdfParams params, vec3 point) {
+    vec3 p = point - params.center;
+
+    float height = seedHeightOffset(params, point) / 25.0;
 
     return max(-hemisphere(params, point), length(p) - (params.radius + height));
 }
@@ -129,15 +134,9 @@ vec3 getNormal(sdfParams params, vec3 point, vec2 fragCoord) {
     return vec3(0.0, 0.1, 0.0);
 }
 
-vec4 getPatternPoint(vec3 point, vec3 center) {
-    float g = 200.0;
-    float dist = (0.5 - length(point.xy)) * 2.0;
-    mat3 rot = mat3(cos(-dist), -sin(-dist), 0.0,
-                    sin(-dist), cos(dist),  0.0,
-                    0.0,       0.0,        1.0);
-    vec3 p = normalize(point - center);
-    p = rot * p;
-    float height = (2.0 + sin(p.y * g)+cos(p.x * g)) / 4.0;
+vec4 getPatternPoint(sdfParams params, vec3 point) {
+
+    float height = seedHeightOffset(params, point);
 
     return vec4(vec3(1.0, 1.0, 0.0) * height, 1.0);
 
@@ -153,7 +152,7 @@ vec4 getTextureColor(sdfParams params, vec3 point, vec2 fragCoord) {
         case 0:
             normal = getNormal(params, point, fragCoord);
             intensity = dot(normal, lightDirection) * 0.9;
-            return getPatternPoint(point, params.center);
+            return getPatternPoint(params, point);
             //return vec4(params.color * intensity, 1.0);
     }
     return vec4(params.color, 1.0);
