@@ -17,11 +17,11 @@ out vec4 out_Col;
 
 const vec3 sunPosition = vec3(100.0,100.0,0.0);
 const float distanceThreshold = 0.001;
-const int numObjects = 1;
+const int numObjects = 2;
 
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
 vec3 v3Ref = vec3(0.0, 0.0, 0.0);
-vec3 v3Eye = vec3(0.0, 0.0, -1.5);
+vec3 v3Eye = vec3(0.0, 0.5, 1.5);
 vec2 v2ScreenPos;
 
 struct sdfParams {
@@ -35,16 +35,69 @@ struct sdfParams {
 
 sdfParams sdfs[numObjects];
 
+
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// Utilities ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+vec2 pixelToScreenPos(vec2 pixelPos) {
+    return (2.0 * vec2(pixelPos.x / iResolution.x, pixelPos.y/iResolution.y)) - vec2(1.0);
+}
+
+vec2 screenToPixelPos(vec2 pixelPos) {
+    return iResolution.xy * (pixelPos + vec2(1.0)) / 2.0;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// SDF Utilities ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+float sdfSubtract( float d1, float d2 ) { return max(-d1,d2); }
+
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// PETALS  ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+
+float sdfEllipsoid( in vec3 p, in vec3 r )
+{
+    float k0 = length(p/r);
+    float k1 = length(p/(r*r));
+    return k0*(k0-1.0)/k1;
+}
+
+float flatPetal( vec3 p, vec3 b, float r )
+{
+  b.y = b.y * smoothstep(0.0, 1.0, clamp(0.0, 1.0, b.x-p.x));
+  vec3 d = abs(p) - b;
+  return length(max(d,0.0)) - r
+         + min(
+            max(d.x,max(d.y,d.z)),0.0); // remove this line for an only partially signed sdf
+}
+
+float petalSDF(sdfParams params, vec3 point) {
+    vec3 p = point - params.center;
+    return flatPetal(p, vec3(1.0,0.2,0.01), 0.0);
+    vec3 r = vec3(params.radius, params.radius/2.0, params.radius/3.0);
+    vec3 p2 = p + vec3(0.0, 0.0,-0.4);
+
+    return sdfSubtract(sdfEllipsoid(p,r), sdfEllipsoid(p2,r));//length(p) - params.radius;
+
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// SEEDS ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
 float seedHeightOffset(sdfParams params, vec3 point) {
     vec3 p = point - params.center;
 
-    float g = 200.0;
+    float g = 100.0;
     float dist = (0.5 - length(point.xy)) * 2.0;
     mat3 rot = mat3(cos(-dist), -sin(-dist), 0.0,
                     sin(-dist), cos(dist),  0.0,
                     0.0,       0.0,        1.0);
     p = rot * p;
-    return (2.0 + sin(p.y * g)+cos(p.x * g))/4.0;
+    return (2.0 + abs(sin(p.y * g))+abs(cos(p.x * g)))/4.0;
 }
 float hemisphere(sdfParams params, vec3 point) {
     return -point.z-0.94;
@@ -58,11 +111,23 @@ float seedsSDF(sdfParams params, vec3 point) {
     return max(-hemisphere(params, point), length(p) - (params.radius + height));
 }
 
+vec4 seedColor(sdfParams params, vec3 point) {
+    float height = seedHeightOffset(params, point);
+    return vec4(vec3(1.0, 1.0, 0.0) * height, 1.0);
+}
+
 
 vec3 sphereNormal(sdfParams params, vec3 point) {
     return normalize(point - params.center);
 }
 
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// Ray Functions ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
 float rayMarch(sdfParams params, vec3 ray, int maxIterations, float maxT) {
     float t = 0.0;
     vec3 rayPos;
@@ -74,7 +139,9 @@ float rayMarch(sdfParams params, vec3 ray, int maxIterations, float maxT) {
 
         //get distance from point on the ray to the object
         switch(params.sdfType) {
-            case 0: distance = seedsSDF           (params, rayPos); break;
+            case 0: distance = seedsSDF (params, rayPos); break;
+            case 1: distance = petalSDF (params, rayPos); break;
+            default: distance = maxT;
         }
 
         //if distance < some epsilon we are done
@@ -105,6 +172,8 @@ vec3 getRay(vec3 up, vec3 eye, vec3 ref, float aspect, vec2 screenPos) {
 
 }
 
+
+
 vec3 getNormalFromRays(sdfParams params, vec2 fragCoord) {
     float aspect = iResolution.x / iResolution.y;
     //calculate the points for 4 surrounding rays
@@ -126,21 +195,23 @@ vec3 getNormalFromRays(sdfParams params, vec2 fragCoord) {
     return normalize(cross(p4-p3, p1-p2));
 }
 
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// normal/color operations ////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
 vec3 getNormal(sdfParams params, vec3 point, vec2 fragCoord) {
     switch(params.sdfType) {
         case 0: return sphereNormal            (params, point);
+        //case 1: return vec3(1.0,1.0,1.0);
         default: return getNormalFromRays      (params, fragCoord);
     }
     return vec3(0.0, 0.1, 0.0);
 }
 
-vec4 getPatternPoint(sdfParams params, vec3 point) {
 
-    float height = seedHeightOffset(params, point);
-
-    return vec4(vec3(1.0, 1.0, 0.0) * height, 1.0);
-
-}
 
 vec4 getTextureColor(sdfParams params, vec3 point, vec2 fragCoord) {
     vec3 normal;
@@ -152,32 +223,42 @@ vec4 getTextureColor(sdfParams params, vec3 point, vec2 fragCoord) {
         case 0:
             normal = getNormal(params, point, fragCoord);
             intensity = dot(normal, lightDirection) * 0.9;
-            return getPatternPoint(params, point);
-            //return vec4(params.color * intensity, 1.0);
+            return seedColor(params, point);
+
+        case 1:
+            normal = getNormal(params, point, fragCoord);
+            intensity = dot(normal, lightDirection) * 0.5 + 0.5;
+            return vec4(params.color*intensity, 1.0);
     }
     return vec4(params.color, 1.0);
 }
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// Initilaization ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
 void initSdfs() {
     //earth
     float pi = 3.14159;
 
+    //seeds
     sdfs[0].sdfType = 0;
-    sdfs[0].center = vec3(0,0,0);
+    sdfs[0].center = vec3(-1.0,0,0);
     sdfs[0].radius = 1.0;
     sdfs[0].color = vec3(0.0, 0.0, 1.0);
 
+
+    //petals
+    sdfs[1].sdfType = 1;
+    sdfs[1].center = vec3(0.5,0,0);
+    sdfs[1].radius = 1.0;
+    sdfs[1].color = vec3(0.0, 0.0, 1.0);
+
 }
 
-vec2 pixelToScreenPos(vec2 pixelPos) {
-    return (2.0 * vec2(pixelPos.x / iResolution.x, pixelPos.y/iResolution.y)) - vec2(1.0);
-}
 
-vec2 screenToPixelPos(vec2 pixelPos) {
-    return iResolution.xy * (pixelPos + vec2(1.0)) / 2.0;
-}
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     fragColor = vec4(0.0, 0.0, 0.0, 1.0);
@@ -192,14 +273,11 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     float t;
 
      for(int i = 0; i < numObjects; i++) {
-        if(sdfs[i].sdfType > -1) {
-            t = rayMarch(sdfs[i], ray, maxIterations, maxT);
-            if( t < maxT) {
-                //get the diffuse term
-                fragColor = getTextureColor(sdfs[i], v3Eye + ray*t, v2ScreenPos);
-                maxT = t;
-            }
-
+        t = rayMarch(sdfs[i], ray, maxIterations, maxT);
+        if( t < maxT) {
+            //get the diffuse term
+            fragColor = getTextureColor(sdfs[i], v3Eye + ray*t, v2ScreenPos);
+            maxT = t;
         }
     }
 
