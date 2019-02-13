@@ -21,7 +21,7 @@ const int numObjects = 2;
 
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
 vec3 v3Ref = vec3(0.0, 0.0, 0.0);
-vec3 v3Eye = vec3(0.0, 0.5, 1.5);
+vec3 v3Eye = vec3(0.0, 0.0, -1.0);
 vec2 v2ScreenPos;
 
 struct sdfParams {
@@ -53,6 +53,27 @@ vec2 screenToPixelPos(vec2 pixelPos) {
 ////////////////////////////////////////////////////////////////////////////////////////////
 float sdfSubtract( float d1, float d2 ) { return max(-d1,d2); }
 
+vec3 opCheapBendX(in vec3 p )
+{
+    const float k = 1.0; // or some other amount
+    float c = cos(k*p.x);
+    float s = sin(k*p.x);
+    mat2  m = mat2(c,-s,s,c);
+    vec3  q = vec3(m*p.xy,p.z);
+    return q;
+}
+
+vec3 opCheapBendY(in vec3 p )
+{
+    const float k = 1.0; // or some other amount
+    float c = cos(k*p.y);
+    float s = sin(k*p.y);
+    mat3  m = mat3(c, 0.0, -s,
+                   0.0, 1.0, 0.0,
+                   s, 0.0, c);
+    return m*p;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// PETALS  ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +87,7 @@ float sdfEllipsoid( in vec3 p, in vec3 r )
 
 float flatPetal( vec3 p, vec3 b, float r )
 {
-  b.y = b.y * smoothstep(0.0, 1.0, clamp(0.0, 1.0, b.x-p.x));
+  b.x = b.x * smoothstep(0.0, 1.0, clamp(0.0, 1.0, b.y-p.y));
   vec3 d = abs(p) - b;
   return length(max(d,0.0)) - r
          + min(
@@ -75,11 +96,8 @@ float flatPetal( vec3 p, vec3 b, float r )
 
 float petalSDF(sdfParams params, vec3 point) {
     vec3 p = point - params.center;
-    return flatPetal(p, vec3(1.0,0.2,0.01), 0.0);
-    vec3 r = vec3(params.radius, params.radius/2.0, params.radius/3.0);
-    vec3 p2 = p + vec3(0.0, 0.0,-0.4);
-
-    return sdfSubtract(sdfEllipsoid(p,r), sdfEllipsoid(p2,r));//length(p) - params.radius;
+    vec3 q = opCheapBendX(p);
+    return flatPetal(q, vec3(0.2,1.0,0.01), 0.0);
 
 }
 
