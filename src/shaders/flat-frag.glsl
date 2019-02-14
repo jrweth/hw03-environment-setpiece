@@ -31,7 +31,7 @@ struct sdfParams {
     float radius;
     vec3 color;
     int extraIntVal;
-    int extraVec3Val;
+    vec3 extraVec3Val;
     mat3 rotation;
 };
 
@@ -124,27 +124,7 @@ vec3 opCheapBendZY(in vec3 p )
 ////////////////////////////////////////// PETALS  ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 
-
 float flatPetal( vec3 p, vec3 b, float r )
-{
-  b.x = b.x * smoothstep(0.0, 0.4, clamp(0.0, 1.0, b.y-p.y));
-  vec3 d = abs(p) - b;
-  return length(max(d,0.0)) - r
-         + min(
-            max(d.x,max(d.y,d.z)),0.0); // remove this line for an only partially signed sdf
-}
-
-float petalSDF(sdfParams params, vec3 point) {
-    vec3 p = params.rotation * (point - params.center);
-    p = point - params.center;
-    p.y += 0.15;
-    vec3 q = p;
-    q = opCheapBendZY(p);
-    return flatPetal(q, vec3(0.05,0.3,0.01), 0.0);
-
-}
-
-float flatPetal2( vec3 p, vec3 b, float r )
 {
   b.y = b.y * smoothstep(0.0, 0.4, clamp(0.0, 1.0, b.x-p.x));
   vec3 d = abs(p) - b;
@@ -153,21 +133,19 @@ float flatPetal2( vec3 p, vec3 b, float r )
             max(d.x,max(d.y,d.z)),0.0); // remove this line for an only partially signed sdf
 }
 
-float petalSDF2(sdfParams params, vec3 point) {
+float petalSDF(sdfParams params, vec3 point) {
     vec3 p = point - params.center;
-    //p.x += 0.5;
-
     p = params.rotation * p;
     vec3 q = p;
     q = opCheapBendZX(p);
-    return flatPetal2(q, vec3(0.3,0.1,0.01), 0.0);
+    return flatPetal(q, params.extraVec3Val, 0.03);
 
 }
 
 float petalsSDF(sdfParams params, vec3 point) {
 
     float petalMin = 9999.0;
-    int numPetals = 20;
+    int numPetals = 12;
     sdfParams params2 = params;
 
     for(int i = 0; i < numPetals; i++) {
@@ -175,12 +153,22 @@ float petalsSDF(sdfParams params, vec3 point) {
        params2.center.x = params.center.x + 4.0*cos(angle)/5.0;
        params2.center.y = params.center.y + 4.0*sin(angle)/5.0;
        params2.rotation = rotateZ(angle);
-       petalMin = min(petalMin, petalSDF2(params2, point));
+       petalMin = min(petalMin, petalSDF(params2, point));
     }
     return petalMin;
 
 }
 
+
+vec3 petalColor(sdfParams params, vec3 point) {
+    vec3 color1 = vec3(0.384, 0.082, 0.047);
+    vec3 color2 = vec3(0.635, 0.184, 0.035);
+    vec3 color3 = vec3(0.996, 0.862, 0.141);
+    vec3 color4 = vec3(1, 0.996, 0.094);
+
+
+    return color4;
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -377,7 +365,7 @@ void initSdfs() {
     sdfs[1].center = vec3(0,0,-0.2);
     sdfs[1].radius = 1.0;
     sdfs[1].color = vec3(1.0, 1.0, 0.0);
-
+    sdfs[1].extraVec3Val = vec3(0.3,0.1,0.01);
 
 
 }
