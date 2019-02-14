@@ -101,7 +101,7 @@ vec3 opCheapBendYZ(in vec3 p )
 //adjust z to bend around x axis
 vec3 opCheapBendZX(in vec3 p )
 {
-    const float k = 1.0; // or some other amount
+    const float k = 10.0; // or some other amount
     float c = cos(k*p.y);
     float s = sin(k*p.y);
     mat2  m = mat2(c, -s, s, c);
@@ -112,7 +112,7 @@ vec3 opCheapBendZX(in vec3 p )
 //adjust z to bend around x axis
 vec3 opCheapBendZY(in vec3 p )
 {
-    const float k = -5.0; // or some other amount
+    const float k = 10.0; // or some other amount
     float c = cos(k*p.x);
     float s = sin(k*p.x);
     mat2  m = mat2(c, -s, s, c);
@@ -127,7 +127,7 @@ vec3 opCheapBendZY(in vec3 p )
 
 float flatPetal( vec3 p, vec3 b, float r )
 {
-  b.x = b.x * smoothstep(0.0, 1.0, clamp(0.0, 1.0, b.y-p.y));
+  b.x = b.x * smoothstep(0.0, 0.4, clamp(0.0, 1.0, b.y-p.y));
   vec3 d = abs(p) - b;
   return length(max(d,0.0)) - r
          + min(
@@ -136,10 +136,31 @@ float flatPetal( vec3 p, vec3 b, float r )
 
 float petalSDF(sdfParams params, vec3 point) {
     vec3 p = params.rotation * (point - params.center);
+    p = point - params.center;
     p.y += 0.15;
     vec3 q = p;
     q = opCheapBendZY(p);
-    return flatPetal(q, vec3(0.1,0.3,0.01), 0.0);
+    return flatPetal(q, vec3(0.05,0.3,0.01), 0.0);
+
+}
+
+float flatPetal2( vec3 p, vec3 b, float r )
+{
+  b.y = b.y * smoothstep(0.0, 0.4, clamp(0.0, 1.0, b.x-p.x));
+  vec3 d = abs(p) - b;
+  return length(max(d,0.0)) - r
+         + min(
+            max(d.x,max(d.y,d.z)),0.0); // remove this line for an only partially signed sdf
+}
+
+float petalSDF2(sdfParams params, vec3 point) {
+    vec3 p = point - params.center;
+    //p.x += 0.5;
+
+    p = params.rotation * p;
+    vec3 q = p;
+    q = opCheapBendZX(p);
+    return flatPetal2(q, vec3(0.3,0.1,0.01), 0.0);
 
 }
 
@@ -147,18 +168,20 @@ float petalsSDF(sdfParams params, vec3 point) {
 
     float petalMin = 9999.0;
     int numPetals = 20;
-    //params.center.y += 0.6;
-    //params.center.x += 0.1;
+    sdfParams params2 = params;
+
     for(int i = 0; i < numPetals; i++) {
        float angle = float(i) * 2.0*pi/float(numPetals);
-       params.center.x -= cos(angle)/5.0;
-       params.center.y -= sin(angle)/5.0;
-       params.rotation = rotateZ(angle);
-       petalMin = min(petalMin, petalSDF(params, point));
+       params2.center.x = params.center.x + 4.0*cos(angle)/5.0;
+       params2.center.y = params.center.y + 4.0*sin(angle)/5.0;
+       params2.rotation = rotateZ(angle);
+       petalMin = min(petalMin, petalSDF2(params2, point));
     }
     return petalMin;
 
 }
+
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// PETALS  ////////////////////////////////////////
@@ -351,7 +374,7 @@ void initSdfs() {
 
         //petals
     sdfs[1].sdfType = 2;
-    sdfs[1].center = vec3(0,0,0);
+    sdfs[1].center = vec3(0,0,-0.2);
     sdfs[1].radius = 1.0;
     sdfs[1].color = vec3(1.0, 1.0, 0.0);
 
