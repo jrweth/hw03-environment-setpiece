@@ -1,6 +1,7 @@
 #version 300 es
 precision highp float;
 
+uniform vec3      u_Eye;
 uniform vec3      iResolution;           // viewport resolution (in pixels)
 uniform float     iTime;                 // shader playback time (in seconds)
 uniform float     iTimeDelta;            // render time (in seconds)
@@ -21,9 +22,9 @@ const int numObjects = 2;
 
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
 vec3 v3Ref = vec3(0.0, 0.0, 0.0);
-vec3 v3Eye = vec3(0.0, 0.0, -1.0);
+vec3 v3Eye = vec3(1.0, 2.0, +1.0);
 vec2 v2ScreenPos;
-
+float pi = 3.14159;
 struct sdfParams {
     int sdfType;
     vec3 center;
@@ -31,6 +32,7 @@ struct sdfParams {
     vec3 color;
     int extraIntVal;
     int extraVec3Val;
+    mat3 rotation;
 };
 
 sdfParams sdfs[numObjects];
@@ -47,13 +49,46 @@ vec2 screenToPixelPos(vec2 pixelPos) {
     return iResolution.xy * (pixelPos + vec2(1.0)) / 2.0;
 }
 
+mat3 rotateX(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat3(1.0, 0.0, 0.0,
+                0.0, c, -s,
+                0.0, s, c);
+}
 
+
+mat3 rotateY(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat3(c, 0.0, -s,
+                0.0, 1.0, 0.0,
+                s, 0.0, c);
+}
+
+mat3 rotateZ(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat3(c, -s, 0.0,
+                s, c, 0.0,
+                0.0, 0.0, 1.0);
+}
 ////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// SDF Utilities ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 float sdfSubtract( float d1, float d2 ) { return max(-d1,d2); }
 
-vec3 opCheapBendX(in vec3 p )
+float sdfUnion( float d1, float d2 ) { return min(d1,d2); }
+
+float sdfEllipsoid( in vec3 p, in vec3 r )
+{
+    float k0 = length(p/r);
+    float k1 = length(p/(r*r));
+    return k0*(k0-1.0)/k1;
+}
+
+//adjust y to bend around around z axis
+vec3 opCheapBendYZ(in vec3 p )
 {
     const float k = 1.0; // or some other amount
     float c = cos(k*p.x);
@@ -63,27 +98,32 @@ vec3 opCheapBendX(in vec3 p )
     return q;
 }
 
-vec3 opCheapBendY(in vec3 p )
+//adjust z to bend around x axis
+vec3 opCheapBendZX(in vec3 p )
 {
     const float k = 1.0; // or some other amount
     float c = cos(k*p.y);
     float s = sin(k*p.y);
-    mat3  m = mat3(c, 0.0, -s,
-                   0.0, 1.0, 0.0,
-                   s, 0.0, c);
-    return m*p;
+    mat2  m = mat2(c, -s, s, c);
+    vec3  q = vec3(p.x, m*p.yz);
+    return q;
 }
 
+//adjust z to bend around x axis
+vec3 opCheapBendZY(in vec3 p )
+{
+    const float k = -5.0; // or some other amount
+    float c = cos(k*p.x);
+    float s = sin(k*p.x);
+    mat2  m = mat2(c, -s, s, c);
+    vec2 xz = m*p.xz;
+    vec3  q = vec3(xz.x,p.y, xz.y);
+    return q;
+}
 ////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// PETALS  ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 
-float sdfEllipsoid( in vec3 p, in vec3 r )
-{
-    float k0 = length(p/r);
-    float k1 = length(p/(r*r));
-    return k0*(k0-1.0)/k1;
-}
 
 float flatPetal( vec3 p, vec3 b, float r )
 {
@@ -95,9 +135,43 @@ float flatPetal( vec3 p, vec3 b, float r )
 }
 
 float petalSDF(sdfParams params, vec3 point) {
+    vec3 p = params.rotation * (point - params.center);
+    p.y += 0.15;
+    vec3 q = p;
+    q = opCheapBendZY(p);
+    return flatPetal(q, vec3(0.1,0.3,0.01), 0.0);
+
+}
+
+float petalsSDF(sdfParams params, vec3 point) {
+
+    float petalMin = 9999.0;
+    int numPetals = 20;
+    //params.center.y += 0.6;
+    //params.center.x += 0.1;
+    for(int i = 0; i < numPetals; i++) {
+       float angle = float(i) * 2.0*pi/float(numPetals);
+       params.center.x -= cos(angle)/5.0;
+       params.center.y -= sin(angle)/5.0;
+       params.rotation = rotateZ(angle);
+       petalMin = min(petalMin, petalSDF(params, point));
+    }
+    return petalMin;
+
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// PETALS  ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+float petals2SDF(sdfParams params, vec3 point) {
     vec3 p = point - params.center;
-    vec3 q = opCheapBendX(p);
-    return flatPetal(q, vec3(0.2,1.0,0.01), 0.0);
+    vec2 norm = normalize(p.xy);
+    float d = length(p) - (0.3 + abs(sin(norm.x)));
+
+    return max(abs(p.z),d);
 
 }
 
@@ -123,14 +197,16 @@ float hemisphere(sdfParams params, vec3 point) {
 
 float seedsSDF(sdfParams params, vec3 point) {
     vec3 p = point - params.center;
+    p.z -= .94;
 
-    float height = seedHeightOffset(params, point) / 25.0;
+    float height = seedHeightOffset(params, p) / 25.0;
 
-    return max(-hemisphere(params, point), length(p) - (params.radius + height));
+    return max(-hemisphere(params, p), length(p) - (params.radius + height));
 }
 
 vec4 seedColor(sdfParams params, vec3 point) {
-    float height = seedHeightOffset(params, point);
+    vec3 p = point - params.center;
+    float height = seedHeightOffset(params, p);
     return vec4(vec3(1.0, 1.0, 0.0) * height, 1.0);
 }
 
@@ -159,6 +235,7 @@ float rayMarch(sdfParams params, vec3 ray, int maxIterations, float maxT) {
         switch(params.sdfType) {
             case 0: distance = seedsSDF (params, rayPos); break;
             case 1: distance = petalSDF (params, rayPos); break;
+            case 2: distance = petalsSDF (params, rayPos); break;
             default: distance = maxT;
         }
 
@@ -247,6 +324,11 @@ vec4 getTextureColor(sdfParams params, vec3 point, vec2 fragCoord) {
             normal = getNormal(params, point, fragCoord);
             intensity = dot(normal, lightDirection) * 0.5 + 0.5;
             return vec4(params.color*intensity, 1.0);
+
+        case 2:
+            normal = getNormal(params, point, fragCoord);
+            intensity = dot(normal, lightDirection) * 0.5 + 0.5;
+            return vec4(params.color*intensity, 1.0);
     }
     return vec4(params.color, 1.0);
 }
@@ -263,16 +345,17 @@ void initSdfs() {
 
     //seeds
     sdfs[0].sdfType = 0;
-    sdfs[0].center = vec3(-1.0,0,0);
+    sdfs[0].center = vec3(0,0,0);
     sdfs[0].radius = 1.0;
     sdfs[0].color = vec3(0.0, 0.0, 1.0);
 
-
-    //petals
-    sdfs[1].sdfType = 1;
-    sdfs[1].center = vec3(0.5,0,0);
+        //petals
+    sdfs[1].sdfType = 2;
+    sdfs[1].center = vec3(0,0,0);
     sdfs[1].radius = 1.0;
-    sdfs[1].color = vec3(0.0, 0.0, 1.0);
+    sdfs[1].color = vec3(1.0, 1.0, 0.0);
+
+
 
 }
 
@@ -304,6 +387,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 void main() {
     //need to convert to pixel dimesions
     vec2 fragCoord = screenToPixelPos(fs_Pos);
+    v3Eye = u_Eye;
     mainImage(out_Col, fragCoord);
 }
 
