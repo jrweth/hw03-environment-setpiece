@@ -16,14 +16,15 @@ uniform vec4      iDate;                 // (year, month, day, time in seconds)
 in vec2 fs_Pos;
 out vec4 out_Col;
 
-const vec3 sunPosition = vec3(5.0,10.0,10.0);
 const float distanceThreshold = 0.001;
-const int numObjects = 3;
+const int numObjects = 4;
 
+float sunSpeed = 1.0;
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
 vec3 v3Ref = vec3(0.0, 0.0, 0.0);
 vec3 v3Eye = vec3(0.0, 0.0, 1.5);
 vec2 v2ScreenPos;
+vec3 sunPosition = vec3(5.0,10.0,10.0);
 float pi = 3.14159;
 struct sdfParams {
     int sdfType;
@@ -125,6 +126,13 @@ mat3 rotateZ(float angle) {
                 s, c, 0.0,
                 0.0, 0.0, 1.0);
 }
+
+
+
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// SDF Utilities ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -173,6 +181,88 @@ vec3 opCheapBendZY(in vec3 p )
     vec3  q = vec3(xz.x,p.y, xz.y);
     return q;
 }
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// Background  ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+float horizonHeight() {
+     return 0.2;
+}
+
+vec4 skyColor() {
+
+      vec4 dawn = vec4(0.1, 0.1, 0.2, 1.0);
+      vec4 noon = vec4(0.02, 0.02, 0.8, 1.0);
+      vec4 dusk = vec4(0.1, 0.1, 0.2, 1.0);
+      vec4 night = vec4(0, 0, 0.05, 1.0);
+
+
+      //night
+      if(sunPosition.y < -4.0) return night;
+      //noon
+      if(sunPosition.y > 4.) return noon;
+
+      //transition to dawn
+      if(sunPosition.x < 0.0 && sunPosition.y < 0.0) {
+          return mix(dawn, night, -sunPosition.y / 4.0);
+      }
+      //transition to noon
+      if(sunPosition.x < 0.0 && sunPosition.y > 0.0) {
+          return mix(dawn, noon, sunPosition.y / 4.0);
+      }
+      //transition to dusk;
+      if(sunPosition.x > 0.0 && sunPosition.y > 0.0) {
+          return mix(dawn, noon, sunPosition.y / 4.0);
+      }
+      //transition to dusk;
+      if(sunPosition.x > 0.0 && sunPosition.y < 0.0) {
+          return mix(dawn, night,  -sunPosition.y / 4.0);
+      }
+
+}
+
+vec4 landColor() {
+
+    vec4 dawn = vec4(0.0, 0.1, 0.0, 1.0);
+    vec4 noon = vec4(0.0, 0.2, 0.0, 1.0);
+    vec4 dusk = vec4(0.0, 0.1, 0.0, 1.0);
+    vec4 night = vec4(0.0, 0.05, 0.0, 1.0);
+
+
+    //night
+    if(sunPosition.y < 0.0) return night;
+    //noon
+    if(sunPosition.y > 8.0) return noon;
+
+    //transition to dawn
+    if(sunPosition.x < 0.0 && sunPosition.y < 0.4) {
+        return mix(dawn, night, -sunPosition.y / 4.0);
+    }
+    //transition to noon
+    if(sunPosition.x < 0.0 && sunPosition.y > 0.4) {
+        return mix(dawn, noon, (sunPosition.y-4.0) / 4.0);
+    }
+    //transition to dusk;
+    if(sunPosition.x > 0.0 && sunPosition.y > 1.0) {
+        return mix(dusk, noon, (sunPosition.y-1.0) / 7.0);
+    }
+    //transition to dusk;
+    if(sunPosition.x > 0.0 && sunPosition.y < 1.0) {
+        return mix(dawn, night,  -sunPosition.y);
+    }
+}
+
+vec4 backgroundColor() {
+
+    if(v2ScreenPos.y < horizonHeight()) {
+        return landColor();
+    }
+    return skyColor();
+
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// PETALS  ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -258,19 +348,21 @@ vec3 petalColor(sdfParams params, vec3 point) {
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////// PETALS  ////////////////////////////////////////
+////////////////////////////////////////// SUN  ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 
-
-
-float petals2SDF(sdfParams params, vec3 point) {
+float sunSDF(sdfParams params, vec3 point) {
     vec3 p = point - params.center;
-    vec2 norm = normalize(p.xy);
-    float d = length(p) - (0.3 + abs(sin(norm.x)));
-
-    return max(abs(p.z),d);
-
+    return length(p) - params.radius;
 }
+
+vec4 sunColor(sdfParams params) {
+    if(v2ScreenPos.y < horizonHeight()) {
+        return backgroundColor();
+    }
+    return vec4(params.color, 1.0);
+}
+
 
 
 
@@ -330,8 +422,8 @@ float rayMarch(sdfParams params, vec3 ray, int maxIterations, float maxT) {
 
         //get distance from point on the ray to the object
         switch(params.sdfType) {
-            case 0: distance = seedsSDF (params, rayPos); break;
-            case 1: distance = petalSDF (params, rayPos); break;
+            case 0: distance = sunSDF (params, rayPos); break;
+            case 1: distance = seedsSDF (params, rayPos); break;
             case 2: distance = petalsSDF (params, rayPos); break;
             default: distance = maxT;
         }
@@ -412,18 +504,17 @@ vec4 getTextureColor(sdfParams params, vec3 point, vec2 fragCoord) {
     float intensity;
 
     switch(params.sdfType) {
+        case 0: //sun
+            return sunColor(params);
+
         ///flat lambert
-        case 0:
-            normal = getNormal(params, point, fragCoord);
+        case 1:   //seeds
+            normal = sphereNormal(params, point);
             intensity = dot(normal, lightDirection) * 0.9;
             return seedColor(params, point);
 
-        case 1:
-            normal = getNormal(params, point, fragCoord);
-            intensity = dot(normal, lightDirection) * 0.5 + 0.5;
-            return vec4(params.color*intensity, 1.0);
 
-        case 2:
+        case 2: //petals
             color = petalColor(params, point);
             normal = getNormal(params, point, fragCoord);
             intensity = dot(normal, lightDirection) * 0.5 + 0.5;
@@ -442,20 +533,21 @@ void initSdfs() {
     //earth
     float pi = 3.14159;
 
-    //seeds
+    //sun
     sdfs[0].sdfType = 0;
-    sdfs[0].center = vec3(0,0,-0.3);
-    sdfs[0].radius = 1.0;
-    sdfs[0].color = vec3(0.0, 0.0, 1.0);
+    sdfs[0].center = sunPosition;
+    sdfs[0].radius = 0.5;
+    sdfs[0].color = vec3(1.0, 1.0, 0.5);
 
-        //petals
-    sdfs[1].sdfType = 2;
-    sdfs[1].center = vec3(0,0,-0.2);
+
+    //seeds
+    sdfs[1].sdfType = 1;
+    sdfs[1].center = vec3(0,0,-0.3);
     sdfs[1].radius = 1.0;
-    sdfs[1].color = vec3(1.0, 1.0, 0.0);
-    sdfs[1].extraVec3Val = vec3(0.5,0.1,0.005);
-    sdfs[1].rotation = rotateZ(0.0);
+    sdfs[1].color = vec3(0.0, 0.0, 1.0);
 
+
+    //second rolw of petals
     sdfs[2].sdfType = 2;
     sdfs[2].center = vec3(0,0,-0.25);
     sdfs[2].radius = 1.0;
@@ -463,14 +555,36 @@ void initSdfs() {
     sdfs[2].extraVec3Val = vec3(0.5,0.1,0.005);
     sdfs[2].rotation = rotateZ(pi/4.0);
 
+    //petals
+    sdfs[3].sdfType = 2;
+    sdfs[3].center = vec3(0,0,-0.2);
+    sdfs[3].radius = 1.0;
+    sdfs[3].color = vec3(1.0, 1.0, 0.0);
+    sdfs[3].extraVec3Val = vec3(0.5,0.1,0.005);
+    sdfs[3].rotation = rotateZ(0.0);
+
 }
 
 
 
-void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-    fragColor = vec4(0.0, 0.0, 0.0, 1.0);
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// Lighting ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+void initLighting() {
+    float timeScale = 0.02;
+    sunPosition = 10.0 * vec3(-cos(iTime * sunSpeed *timeScale)/4.0,
+                       sin(iTime * sunSpeed * timeScale),
+                       -cos(iTime * sunSpeed * timeScale)/2.0);
+}
 
+
+
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     v2ScreenPos = pixelToScreenPos(fragCoord);
+    initLighting();
+    fragColor = backgroundColor();
+
     //set up
     initSdfs();
     vec3 ray= getRay(v3Up, v3Eye, v3Ref, iResolution.x/iResolution.y, v2ScreenPos) ;
@@ -487,6 +601,9 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
             maxT = t;
         }
     }
+
+    //gamma correction
+    fragColor = vec4(pow(fragColor.rgb, vec3(1.0/2.2)), 1.0);
 
 }
 
