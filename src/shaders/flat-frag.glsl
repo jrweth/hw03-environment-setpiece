@@ -22,7 +22,7 @@ const int numObjects = 3;
 
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
 vec3 v3Ref = vec3(0.0, 0.0, 0.0);
-vec3 v3Eye = vec3(1.0, 2.0, +1.0);
+vec3 v3Eye = vec3(0.0, 0.0, 1.5);
 vec2 v2ScreenPos;
 float pi = 3.14159;
 struct sdfParams {
@@ -37,6 +37,58 @@ struct sdfParams {
 
 sdfParams sdfs[numObjects];
 
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// Random/Noise Functions ////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+
+float random1( vec2 p , vec2 seed) {
+  return fract(sin(dot(p + seed, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float random1( vec3 p , vec3 seed) {
+  return fract(sin(dot(p + seed, vec3(987.654, 123.456, 531.975))) * 85734.3545);
+}
+
+vec2 random2( vec2 p , vec2 seed) {
+  return fract(sin(vec2(dot(p + seed, vec2(311.7, 127.1)), dot(p + seed, vec2(269.5, 183.3)))) * 85734.3545);
+}
+
+
+
+float interpNoiseRandom2to1(vec2 p, vec2 seed) {
+    float fractX = fract(p.x);
+    float x1 = floor(p.x);
+    float x2 = x1 + 1.0;
+
+    float fractY = fract(p.y);
+    float y1 = floor(p.y);
+    float y2 = y1 + 1.0;
+
+    float v1 = random1(vec2(x1, y1), seed);
+    float v2 = random1(vec2(x2, y1), seed);
+    float v3 = random1(vec2(x1, y2), seed);
+    float v4 = random1(vec2(x2, y2), seed);
+
+    float i1 = mix(v1, v2, fractX);
+    float i2 = mix(v3, v4, fractX);
+
+//    return smoothstep(i1, i2, fractY);
+    return mix(i1, i2, fractY);
+
+}
+
+float fbm2to1(vec2 p, vec2 seed) {
+    float total  = 0.0;
+    float persistence = 0.5;
+    float octaves = 8.0;
+
+    for(float i = 0.0; i < octaves; i++) {
+        float freq = pow(2.0, i);
+        float amp = pow(persistence, i+1.0);
+        total = total + interpNoiseRandom2to1(p * freq, seed) * amp;
+    }
+    return total;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// Utilities ////////////////////////////////////////
@@ -94,7 +146,8 @@ vec3 opCheapBendYZ(in vec3 p )
     float c = cos(k*p.x);
     float s = sin(k*p.x);
     mat2  m = mat2(c,-s,s,c);
-    vec3  q = vec3(m*p.xy,p.z);
+    vec2 xz = m*p.xz;
+    vec3  q = vec3(xz[0], p.y,xz[1]);
     return q;
 }
 
@@ -136,8 +189,12 @@ float flatPetal( vec3 p, vec3 b, float r )
 float petalSDF(sdfParams params, vec3 point) {
     vec3 p = point - params.center;
     p = params.rotation * p;
+
+    ///add some noise to the y vector
+    p.y += sin(p.x*4.0 + (random1(params.center.xy, params.center.xz) -0.5)*4.0) * 0.05;
     vec3 q = p;
     q = opCheapBendZX(p);
+    //q = opCheapBendZY(q);
     return flatPetal(q, params.extraVec3Val, 0.03);
 
 }
@@ -150,10 +207,15 @@ float petalsSDF(sdfParams params, vec3 point) {
     sdfParams params2 = params;
 
     for(int i = 0; i < numPetals; i++) {
-       float angle = float(i) * 2.0*pi/float(numPetals);
+       //get random value for adjusting placement/length
+       float adjust = random1(params2.center, vec3(1,2,3))-0.5;
+       float angle = float(i) * 2.0*pi/float(numPetals) + adjust*0.15;
        params2.center.x = params.center.x + cos(angle)*0.7;
        params2.center.y = params.center.y + sin(angle)*0.7;;
        params2.rotation = rotateZ(angle);
+       //adjust the petal length
+       params2.extraVec3Val.x += (random1(params2.center, vec3(1,2,3))-0.5)*0.2;
+       params2.extraVec3Val.y += (random1(params2.center, vec3(1,2,3))-0.5)*0.05;
        petalMin = min(petalMin, petalSDF(params2, p));
     }
     return petalMin;
@@ -406,7 +468,7 @@ void initSdfs() {
 
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-    fragColor = vec4(0.0, 0.0, 1.0, 1.0);
+    fragColor = vec4(0.0, 0.0, 0.0, 1.0);
 
     v2ScreenPos = pixelToScreenPos(fragCoord);
     //set up
