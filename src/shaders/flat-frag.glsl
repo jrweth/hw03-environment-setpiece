@@ -16,9 +16,9 @@ uniform vec4      iDate;                 // (year, month, day, time in seconds)
 in vec2 fs_Pos;
 out vec4 out_Col;
 
-const vec3 sunPosition = vec3(100.0,100.0,0.0);
+const vec3 sunPosition = vec3(5.0,10.0,10.0);
 const float distanceThreshold = 0.001;
-const int numObjects = 2;
+const int numObjects = 3;
 
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
 vec3 v3Ref = vec3(0.0, 0.0, 0.0);
@@ -144,16 +144,17 @@ float petalSDF(sdfParams params, vec3 point) {
 
 float petalsSDF(sdfParams params, vec3 point) {
 
+    vec3 p = params.rotation * (point - params.center);
     float petalMin = 9999.0;
     int numPetals = 12;
     sdfParams params2 = params;
 
     for(int i = 0; i < numPetals; i++) {
        float angle = float(i) * 2.0*pi/float(numPetals);
-       params2.center.x = params.center.x + 4.0*cos(angle)/5.0;
-       params2.center.y = params.center.y + 4.0*sin(angle)/5.0;
+       params2.center.x = params.center.x + cos(angle)*0.7;
+       params2.center.y = params.center.y + sin(angle)*0.7;;
        params2.rotation = rotateZ(angle);
-       petalMin = min(petalMin, petalSDF(params2, point));
+       petalMin = min(petalMin, petalSDF(params2, p));
     }
     return petalMin;
 
@@ -161,13 +162,36 @@ float petalsSDF(sdfParams params, vec3 point) {
 
 
 vec3 petalColor(sdfParams params, vec3 point) {
+    vec3 color;
     vec3 color1 = vec3(0.384, 0.082, 0.047);
     vec3 color2 = vec3(0.635, 0.184, 0.035);
     vec3 color3 = vec3(0.996, 0.862, 0.141);
-    vec3 color4 = vec3(1, 0.996, 0.094);
+    vec3 color4 = vec3(1.0, 1.0, 0.4);
 
 
-    return color4;
+    vec2 p = normalize(point.xy - params.center.xy);
+    float percent = (length(point - params.center) - 0.5);// / params.extraVec3Val.x;
+    vec3 stripedColor = mix(color2, color4, abs(sin(400.0*acos(p.x)/pi)));
+    if(percent < 0.1) {
+        color = mix(color1, color2, percent * 10.0);
+    }
+    else if(percent < 0.2) {
+        color = mix(color2, color3, (percent - 0.1) * 10.0);
+        color = mix(color, stripedColor, pow(percent, 2.0));
+    }
+    else if(percent < 0.4)  {
+        color = mix(color3, color4, (percent - 0.2) * 5.0);
+        color = mix(color, stripedColor, pow(percent, 2.0));
+    }
+    else {
+        color = color4;
+    }
+
+
+
+
+
+    return  color;
 }
 
 
@@ -194,7 +218,7 @@ float petals2SDF(sdfParams params, vec3 point) {
 float seedHeightOffset(sdfParams params, vec3 point) {
     vec3 p = point - params.center;
 
-    float g = 100.0;
+    float g = 80.0;
     float dist = (0.5 - length(point.xy)) * 2.0;
     mat3 rot = mat3(cos(-dist), -sin(-dist), 0.0,
                     sin(-dist), cos(dist),  0.0,
@@ -203,12 +227,12 @@ float seedHeightOffset(sdfParams params, vec3 point) {
     return (2.0 + abs(sin(p.y * g))+abs(cos(p.x * g)))/4.0;
 }
 float hemisphere(sdfParams params, vec3 point) {
-    return -point.z-0.94;
+    return point.z-0.97;
 }
 
 float seedsSDF(sdfParams params, vec3 point) {
     vec3 p = point - params.center;
-    p.z -= .94;
+    p.z += .97;
 
     float height = seedHeightOffset(params, p) / 25.0;
 
@@ -321,6 +345,7 @@ vec3 getNormal(sdfParams params, vec3 point, vec2 fragCoord) {
 
 vec4 getTextureColor(sdfParams params, vec3 point, vec2 fragCoord) {
     vec3 normal;
+    vec3 color;
     vec3 lightDirection = normalize(sunPosition - point);
     float intensity;
 
@@ -337,9 +362,10 @@ vec4 getTextureColor(sdfParams params, vec3 point, vec2 fragCoord) {
             return vec4(params.color*intensity, 1.0);
 
         case 2:
+            color = petalColor(params, point);
             normal = getNormal(params, point, fragCoord);
             intensity = dot(normal, lightDirection) * 0.5 + 0.5;
-            return vec4(params.color*intensity, 1.0);
+            return vec4(color*intensity, 1.0);
     }
     return vec4(params.color, 1.0);
 }
@@ -356,7 +382,7 @@ void initSdfs() {
 
     //seeds
     sdfs[0].sdfType = 0;
-    sdfs[0].center = vec3(0,0,0);
+    sdfs[0].center = vec3(0,0,-0.3);
     sdfs[0].radius = 1.0;
     sdfs[0].color = vec3(0.0, 0.0, 1.0);
 
@@ -365,15 +391,22 @@ void initSdfs() {
     sdfs[1].center = vec3(0,0,-0.2);
     sdfs[1].radius = 1.0;
     sdfs[1].color = vec3(1.0, 1.0, 0.0);
-    sdfs[1].extraVec3Val = vec3(0.3,0.1,0.01);
+    sdfs[1].extraVec3Val = vec3(0.5,0.1,0.005);
+    sdfs[1].rotation = rotateZ(0.0);
 
+    sdfs[2].sdfType = 2;
+    sdfs[2].center = vec3(0,0,-0.25);
+    sdfs[2].radius = 1.0;
+    sdfs[2].color = vec3(1.0, 1.0, 0.0);
+    sdfs[2].extraVec3Val = vec3(0.5,0.1,0.005);
+    sdfs[2].rotation = rotateZ(pi/4.0);
 
 }
 
 
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-    fragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    fragColor = vec4(0.0, 0.0, 1.0, 1.0);
 
     v2ScreenPos = pixelToScreenPos(fragCoord);
     //set up
