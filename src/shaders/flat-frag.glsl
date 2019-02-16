@@ -16,8 +16,9 @@ uniform vec4      iDate;                 // (year, month, day, time in seconds)
 in vec2 fs_Pos;
 out vec4 out_Col;
 
+const float sceneRadius = 100.0;
 const float distanceThreshold = 0.001;
-const int numObjects = 4;
+const int numObjects = 7;
 
 float sunSpeed = 1.0;
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
@@ -25,6 +26,7 @@ vec3 v3Ref = vec3(0.0, 0.0, 0.0);
 vec3 v3Eye = vec3(0.0, 0.0, 1.5);
 vec2 v2ScreenPos;
 vec3 sunPosition = vec3(5.0,10.0,10.0);
+float sunBloomDistance;        //the distance of the ray from teh sun in the sky
 float pi = 3.14159;
 struct sdfParams {
     int sdfType;
@@ -208,40 +210,39 @@ float horizonHeight() {
 vec3 skyColor() {
 
       vec3 color;
-      vec3 dawn = vec3(0.1, 0.1, 0.2);
-      vec3 noon = vec3(0.02, 0.02, 0.8);
+      vec3 dawn = vec3(0.2, 0.2, 0.3);
+      vec3 noon = vec3(0.04, 0.04, 0.8);
       vec3 dusk = vec3(0.1, 0.1, 0.2);
       vec3 night = vec3(0, 0, 0.05);
 
 
       //night
-      if(sunPosition.y < -4.0) {return night;}
-
+      if(sunPosition.y < -20.0) {
+          color = night;
+      }
       //noon
-      else if(sunPosition.y > 4.) {color = noon;}
+      else if(sunPosition.y > 40.0) {color = noon;}
 
       //transition to dawn
       else if(sunPosition.x < 0.0 && sunPosition.y < 0.0) {
-          color = mix(dawn, night, -sunPosition.y / 4.0);
+          color = mix(dawn, night, -sunPosition.y / 20.0);
       }
       //transition to noon
       else if(sunPosition.x < 0.0 && sunPosition.y > 0.0) {
-          color = mix(dawn, noon, sunPosition.y / 4.0);
+          color = mix(dawn, noon, sunPosition.y / 40.0);
       }
       //transition to dusk;
       else if(sunPosition.x > 0.0 && sunPosition.y > 0.0) {
-          color = mix(dawn, noon, sunPosition.y / 4.0);
+          color = mix(dawn, noon, sunPosition.y / 40.0);
       }
       //transition to dusk;
       else if(sunPosition.x > 0.0 && sunPosition.y < 0.0) {
-          color =  mix(dawn, night,  -sunPosition.y / 4.0);
+          color =  mix(dawn, night,  -sunPosition.y / 40.0);
       }
 
 
       //add a bloom around the sun
-      vec3 ray = getRay(v3Up, v3Eye, v3Ref, iResolution.x/iResolution.y, v2ScreenPos);
-      float bloom = pow(dot(ray, normalize(sunPosition - v3Eye))/2.0, 3.0);
-      color = color * (1.0 + bloom);
+      color = color * pow(clamp(5.0 - sunBloomDistance, 1.0, 5.0), 1.5);
 
       return color;
 
@@ -433,14 +434,28 @@ vec3 seedColor(sdfParams params, vec3 point) {
 ////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// Ray Functions ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
-float rayMarch(sdfParams params, vec3 ray, int maxIterations, float maxT) {
+
+float objectDistance(sdfParams params, vec3 point, float maxDistance) {
+    //get distance from point on the ray to the object
+    switch(params.sdfType) {
+        case 0: return sunSDF (params, point);
+        case 1: return seedsSDF (params, point);
+        case 2: return petalsSDF (params, point);
+    }
+    return maxDistance;
+
+}
+
+
+float rayMarch(sdfParams params, vec3 ray, vec3 origin, int maxIterations, float maxT, out float closestDistance) {
     float t = 0.0;
     vec3 rayPos;
     float distance;
     int iterations = 0;
+    closestDistance = sceneRadius;
     while (t < maxT && iterations <= maxIterations) {
 
-        rayPos = v3Eye + t * ray;
+        rayPos = origin + t * ray;
 
         //get distance from point on the ray to the object
         switch(params.sdfType) {
@@ -450,8 +465,13 @@ float rayMarch(sdfParams params, vec3 ray, int maxIterations, float maxT) {
             default: distance = maxT;
         }
 
+        if(distance < closestDistance) {
+             closestDistance = distance;
+        }
+
         //if distance < some epsilon we are done
         if(distance < distanceThreshold) {
+            closestDistance = t;
             return t;
         }
 
@@ -465,21 +485,49 @@ float rayMarch(sdfParams params, vec3 ray, int maxIterations, float maxT) {
 
 
 
+void rayMarchWorld(vec3 origin, vec3 ray, float maxT, out float t, out float minClosestDistance, out int sdfIndex) {
+
+    int maxIterations = 100;
+    float cDistance;
+
+    t = maxT;
+    minClosestDistance = sceneRadius * 2.0;
+    sdfParams params;
+
+    for(int i = 0; i < numObjects; i++) {
+        params = sdfs[i];
+        float objectT = rayMarch(params, ray, origin, maxIterations, t, cDistance);
+        if( objectT < t) { //must have hit an object closer than the previous
+            sdfIndex = i;
+            t = objectT;
+        }
+        if(cDistance < minClosestDistance) {
+            minClosestDistance = cDistance;
+        }
+        if(i == 0 && origin == v3Eye) {
+            sunBloomDistance = cDistance;
+        }
+    }
+}
+
+
+
 
 
 
 vec3 getNormalFromRays(sdfParams params, vec2 fragCoord) {
     float aspect = iResolution.x / iResolution.y;
+    float closestDistance;
     //calculate the points for 4 surrounding rays
     vec3 ray1 = getRay(v3Up, v3Eye, v3Ref, aspect, fragCoord + vec2(-0.001,  0.0));
     vec3 ray2 = getRay(v3Up, v3Eye, v3Ref, aspect, fragCoord + vec2( 0.001,  0.0));
     vec3 ray3 = getRay(v3Up, v3Eye, v3Ref, aspect, fragCoord + vec2( 0.00, -0.001));
     vec3 ray4 = getRay(v3Up, v3Eye, v3Ref, aspect, fragCoord + vec2( 0.00,  0.001));
 
-    float t1 =  rayMarch(params, ray1, 100, 100.0);
-    float t2 =  rayMarch(params, ray2, 100, 100.0);
-    float t3 =  rayMarch(params, ray3, 100, 100.0);
-    float t4 =  rayMarch(params, ray4, 100, 100.0);
+    float t1 =  rayMarch(params, ray1, v3Eye, 100, sceneRadius, closestDistance);
+    float t2 =  rayMarch(params, ray2, v3Eye, 100, sceneRadius, closestDistance);
+    float t3 =  rayMarch(params, ray3, v3Eye, 100, sceneRadius, closestDistance);
+    float t4 =  rayMarch(params, ray4, v3Eye, 100, sceneRadius, closestDistance);
 
     vec3 p1 = v3Eye + ray1 * t1;
     vec3 p2 = v3Eye + ray2 * t2;
@@ -521,12 +569,26 @@ vec3 getTextureColor(sdfParams params, vec3 point) {
     return params.color;
 }
 
+
+
+//float shadow( in vec3 ro, in vec3 rd, float mint, float maxt )
+//{
+//    for( float t=mint; t < maxt; )
+//    {
+//        float h = map(ro + rd*t);
+//        if( h<0.001 )
+//            return 0.0;
+//        t += h;
+//    }
+//    return 1.0;
+//}
+
 void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point) {
     vec3 direction;
     vec3 lightColor;
     vec3 sunDirection = normalize(sunPosition - point);
     vec3 sunColor = vec3(1.5, 1.25, 1.0);
-    vec3 skyColor = vec3(0.16,0.20,0.28);
+    vec3 skyColor = vec3(0.08,0.10,0.14);
     vec3 indirectColor = vec3(0.04, 0.028, 0.020);
 
     //get three light intensities
@@ -537,16 +599,20 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point) {
 
     //when sun rising and setting adjunst brightness and redness up and down
 
-    if(sunPosition.y < 2.0) {
-       sun = sun * sunPosition.y/2.0;
-       sunColor.r = sunColor.r + (2.0 - sunPosition.y);
+
+
+    //make sun brighter at noon
+    sun = sun * sunPosition.y/80.0;
+
+    if(sunPosition.x > 0.0 && sunPosition.y < 35.0)  {
+        sunColor.r = sunColor.r + (35.0 - sunPosition.y)/25.0;
     }
     if(sunPosition.y < 0.0) {
        sun = 0.0;
     }
 
     vec3 intensity = sun*sunColor
-                    + sky * skyColor
+                    + sky * skyColor;
                     + indirect * indirectColor;
 
     color = color * intensity;
@@ -567,7 +633,7 @@ void initSdfs() {
     //sun
     sdfs[0].sdfType = 0;
     sdfs[0].center = sunPosition;
-    sdfs[0].radius = 0.5;
+    sdfs[0].radius = 3.0;
     sdfs[0].color = vec3(1.0, 1.0, 0.5);
 
 
@@ -578,7 +644,7 @@ void initSdfs() {
     sdfs[1].color = vec3(0.0, 0.0, 1.0);
 
 
-    //second rolw of petals
+    //row of petals
     sdfs[2].sdfType = 2;
     sdfs[2].center = vec3(0,0,-0.25);
     sdfs[2].radius = 1.0;
@@ -594,6 +660,21 @@ void initSdfs() {
     sdfs[3].extraVec3Val = vec3(0.5,0.1,0.005);
     sdfs[3].rotation = rotateZ(0.0);
 
+    if(numObjects > 4) {
+        //seeds
+        sdfs[4].sdfType = 1;
+        sdfs[4].center = vec3(2.0,0,-0.3);
+        sdfs[4].radius = 1.0;
+        sdfs[4].color = vec3(0.0, 0.0, 1.0);
+
+        //row of petals
+        sdfs[5].sdfType = 2;
+        sdfs[5].center = vec3(2.0,0,-0.25);
+        sdfs[5].radius = 1.0;
+        sdfs[5].color = vec3(1.0, 1.0, 0.0);
+        sdfs[5].extraVec3Val = vec3(0.5,0.1,0.005);
+        sdfs[5].rotation = rotateZ(pi/4.0);
+    }
 }
 
 
@@ -602,10 +683,12 @@ void initSdfs() {
 ////////////////////////////////////////// Lighting ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 void initLighting() {
-    float timeScale = 0.02;
-    sunPosition = 10.0 * vec3(-cos(iTime * sunSpeed *timeScale)/4.0,
-                       sin(iTime * sunSpeed * timeScale),
-                       -cos(iTime * sunSpeed * timeScale)/2.0);
+    float timeScale = 0.05;
+    float time = 330.0;
+    time = iTime;
+    sunPosition = 80.0 * vec3(-cos(time * sunSpeed *timeScale)/4.0,
+                       sin(time * sunSpeed * timeScale),
+                       -cos(time * sunSpeed * timeScale)/2.0);
 }
 
 
@@ -614,31 +697,25 @@ void initLighting() {
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     v2ScreenPos = pixelToScreenPos(fragCoord);
     initLighting();
-    vec3 color = backgroundColor();
     vec3 normal;
 
     //set up
     initSdfs();
-    vec3 ray= getRay(v3Up, v3Eye, v3Ref, iResolution.x/iResolution.y, v2ScreenPos) ;
 
-    float maxT = 100.0;
-    int maxIterations = 100;
+    float closestDistance;
     float t;
     int sdfIndex;
+    vec3 point;
 
 
-    for(int i = 0; i < numObjects; i++) {
-        t = rayMarch(sdfs[i], ray, maxIterations, maxT);
-        if( t < maxT) {
-            vec3 point = v3Eye + ray*t;
-            maxT = t;
-            sdfIndex = i;
-        }
-    }
+    vec3 ray= getRay(v3Up, v3Eye, v3Ref, iResolution.x/iResolution.y, v2ScreenPos) ;
+    rayMarchWorld(v3Eye, ray, sceneRadius, t, closestDistance, sdfIndex);
+    point = v3Eye + ray * t;
+
+    vec3 color = backgroundColor();
 
     //go get the color
-    if(t < 100.0) {
-        vec3 point = v3Eye + ray*t;
+    if(t < sceneRadius) {
         color = getTextureColor(sdfs[sdfIndex], point);
         normal = getNormal(sdfs[sdfIndex], point, v2ScreenPos);
         if(sdfIndex > 0) {
@@ -648,6 +725,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
     //gamma correction
     fragColor = vec4(pow(color, vec3(1.0/2.2)), 1.0);
+
 
 }
 
