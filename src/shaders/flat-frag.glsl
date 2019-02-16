@@ -36,6 +36,7 @@ struct sdfParams {
     mat3 rotation;
 };
 
+
 sdfParams sdfs[numObjects];
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -100,6 +101,19 @@ vec2 pixelToScreenPos(vec2 pixelPos) {
 
 vec2 screenToPixelPos(vec2 pixelPos) {
     return iResolution.xy * (pixelPos + vec2(1.0)) / 2.0;
+}
+
+//  Function to calculate the ray based upn the up, eye, ref, aspect ration and screen position
+vec3 getRay(vec3 up, vec3 eye, vec3 ref, float aspect, vec2 screenPos) {
+    vec3 right = normalize(cross( up - eye, up));  //right vector
+    float len = length(ref - eye);   //length
+    vec3 vert = up * len; //normally this would also be based upon FOV tan(FOV) but we are constraing to the box
+    vec3 horiz = right * aspect * len; //normally this would also be based upon FOV tan(FOV) but we are constraining to the box
+    vec3 point = ref + (screenPos.x * horiz) + screenPos.y * vert;
+
+    //calculate the ray
+    return normalize(point - eye);
+
 }
 
 mat3 rotateX(float angle) {
@@ -191,44 +205,54 @@ float horizonHeight() {
      return 0.2;
 }
 
-vec4 skyColor() {
+vec3 skyColor() {
 
-      vec4 dawn = vec4(0.1, 0.1, 0.2, 1.0);
-      vec4 noon = vec4(0.02, 0.02, 0.8, 1.0);
-      vec4 dusk = vec4(0.1, 0.1, 0.2, 1.0);
-      vec4 night = vec4(0, 0, 0.05, 1.0);
+      vec3 color;
+      vec3 dawn = vec3(0.1, 0.1, 0.2);
+      vec3 noon = vec3(0.02, 0.02, 0.8);
+      vec3 dusk = vec3(0.1, 0.1, 0.2);
+      vec3 night = vec3(0, 0, 0.05);
 
 
       //night
-      if(sunPosition.y < -4.0) return night;
+      if(sunPosition.y < -4.0) {return night;}
+
       //noon
-      if(sunPosition.y > 4.) return noon;
+      else if(sunPosition.y > 4.) {color = noon;}
 
       //transition to dawn
-      if(sunPosition.x < 0.0 && sunPosition.y < 0.0) {
-          return mix(dawn, night, -sunPosition.y / 4.0);
+      else if(sunPosition.x < 0.0 && sunPosition.y < 0.0) {
+          color = mix(dawn, night, -sunPosition.y / 4.0);
       }
       //transition to noon
-      if(sunPosition.x < 0.0 && sunPosition.y > 0.0) {
-          return mix(dawn, noon, sunPosition.y / 4.0);
+      else if(sunPosition.x < 0.0 && sunPosition.y > 0.0) {
+          color = mix(dawn, noon, sunPosition.y / 4.0);
       }
       //transition to dusk;
-      if(sunPosition.x > 0.0 && sunPosition.y > 0.0) {
-          return mix(dawn, noon, sunPosition.y / 4.0);
+      else if(sunPosition.x > 0.0 && sunPosition.y > 0.0) {
+          color = mix(dawn, noon, sunPosition.y / 4.0);
       }
       //transition to dusk;
-      if(sunPosition.x > 0.0 && sunPosition.y < 0.0) {
-          return mix(dawn, night,  -sunPosition.y / 4.0);
+      else if(sunPosition.x > 0.0 && sunPosition.y < 0.0) {
+          color =  mix(dawn, night,  -sunPosition.y / 4.0);
       }
+
+
+      //add a bloom around the sun
+      vec3 ray = getRay(v3Up, v3Eye, v3Ref, iResolution.x/iResolution.y, v2ScreenPos);
+      float bloom = pow(dot(ray, normalize(sunPosition - v3Eye))/2.0, 3.0);
+      color = color * (1.0 + bloom);
+
+      return color;
 
 }
 
-vec4 landColor() {
+vec3 landColor() {
 
-    vec4 dawn = vec4(0.0, 0.1, 0.0, 1.0);
-    vec4 noon = vec4(0.0, 0.2, 0.0, 1.0);
-    vec4 dusk = vec4(0.0, 0.1, 0.0, 1.0);
-    vec4 night = vec4(0.0, 0.05, 0.0, 1.0);
+    vec3 dawn = vec3(0.0, 0.1, 0.0);
+    vec3 noon = vec3(0.0, 0.2, 0.0);
+    vec3 dusk = vec3(0.0, 0.1, 0.0);
+    vec3 night = vec3(0.0, 0.05, 0.0);
 
 
     //night
@@ -237,24 +261,25 @@ vec4 landColor() {
     if(sunPosition.y > 8.0) return noon;
 
     //transition to dawn
-    if(sunPosition.x < 0.0 && sunPosition.y < 0.4) {
-        return mix(dawn, night, -sunPosition.y / 4.0);
+    if(sunPosition.x < 0.0 && sunPosition.y < 4.0) {
+        return mix(night, dawn, sunPosition.y / 4.0);
     }
     //transition to noon
-    if(sunPosition.x < 0.0 && sunPosition.y > 0.4) {
+    if(sunPosition.x < 0.0 && sunPosition.y > 4.0) {
         return mix(dawn, noon, (sunPosition.y-4.0) / 4.0);
     }
     //transition to dusk;
-    if(sunPosition.x > 0.0 && sunPosition.y > 1.0) {
-        return mix(dusk, noon, (sunPosition.y-1.0) / 7.0);
+    if(sunPosition.x > 0.0 && sunPosition.y > 2.0) {
+        return mix(dusk, noon, (sunPosition.y-2.0) / 6.0);
     }
     //transition to dusk;
-    if(sunPosition.x > 0.0 && sunPosition.y < 1.0) {
-        return mix(dawn, night,  -sunPosition.y);
+    if(sunPosition.x > 0.0 && sunPosition.y < 2.0) {
+        return mix(night, dusk, sunPosition.y/ 2.0);
     }
+
 }
 
-vec4 backgroundColor() {
+vec3 backgroundColor() {
 
     if(v2ScreenPos.y < horizonHeight()) {
         return landColor();
@@ -339,10 +364,6 @@ vec3 petalColor(sdfParams params, vec3 point) {
         color = color4;
     }
 
-
-
-
-
     return  color;
 }
 
@@ -356,11 +377,11 @@ float sunSDF(sdfParams params, vec3 point) {
     return length(p) - params.radius;
 }
 
-vec4 sunColor(sdfParams params) {
+vec3 sunColor(sdfParams params, vec3 point) {
     if(v2ScreenPos.y < horizonHeight()) {
         return backgroundColor();
     }
-    return vec4(params.color, 1.0);
+    return params.color;
 }
 
 
@@ -393,17 +414,18 @@ float seedsSDF(sdfParams params, vec3 point) {
     return max(-hemisphere(params, p), length(p) - (params.radius + height));
 }
 
-vec4 seedColor(sdfParams params, vec3 point) {
-    vec3 p = point - params.center;
-    float height = seedHeightOffset(params, p);
-    return vec4(vec3(1.0, 1.0, 0.0) * height, 1.0);
-}
 
 
 vec3 sphereNormal(sdfParams params, vec3 point) {
     return normalize(point - params.center);
 }
 
+
+vec3 seedColor(sdfParams params, vec3 point) {
+    vec3 p = point - params.center;
+    float height = seedHeightOffset(params, p);
+    return vec3(1.0, 1.0, 0.0) * height;
+}
 
 
 
@@ -443,18 +465,6 @@ float rayMarch(sdfParams params, vec3 ray, int maxIterations, float maxT) {
 
 
 
-//  Function to calculate the ray based upn the up, eye, ref, aspect ration and screen position
-vec3 getRay(vec3 up, vec3 eye, vec3 ref, float aspect, vec2 screenPos) {
-    vec3 right = normalize(cross( up - eye, up));  //right vector
-    float len = length(ref - eye);   //length
-    vec3 vert = up * len; //normally this would also be based upon FOV tan(FOV) but we are constraing to the box
-    vec3 horiz = right * aspect * len; //normally this would also be based upon FOV tan(FOV) but we are constraining to the box
-    vec3 point = ref + (screenPos.x * horiz) + screenPos.y * vert;
-
-    //calculate the ray
-    return normalize(point - eye);
-
-}
 
 
 
@@ -497,31 +507,52 @@ vec3 getNormal(sdfParams params, vec3 point, vec2 fragCoord) {
 
 
 
-vec4 getTextureColor(sdfParams params, vec3 point, vec2 fragCoord) {
+vec3 getTextureColor(sdfParams params, vec3 point) {
     vec3 normal;
     vec3 color;
     vec3 lightDirection = normalize(sunPosition - point);
     float intensity;
 
     switch(params.sdfType) {
-        case 0: //sun
-            return sunColor(params);
-
-        ///flat lambert
-        case 1:   //seeds
-            normal = sphereNormal(params, point);
-            intensity = dot(normal, lightDirection) * 0.9;
-            return seedColor(params, point);
-
-
-        case 2: //petals
-            color = petalColor(params, point);
-            normal = getNormal(params, point, fragCoord);
-            intensity = dot(normal, lightDirection) * 0.5 + 0.5;
-            return vec4(color*intensity, 1.0);
+        case 0: return sunColor(params, point);
+        case 1: return seedColor(params, point);
+        case 2: return petalColor(params, point);
     }
-    return vec4(params.color, 1.0);
+    return params.color;
 }
+
+void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point) {
+    vec3 direction;
+    vec3 lightColor;
+    vec3 sunDirection = normalize(sunPosition - point);
+    vec3 sunColor = vec3(1.5, 1.25, 1.0);
+    vec3 skyColor = vec3(0.16,0.20,0.28);
+    vec3 indirectColor = vec3(0.04, 0.028, 0.020);
+
+    //get three light intensities
+    float sun = clamp(dot(normal, sunDirection), 0.0, 1.0);
+    float sky = clamp(0.5 + 0.5*normal.y, 0.0, 1.0);
+    //float indirect = clamp(dot(normal, normalize(sunDirection * vec3(-1.0, 0.0, -1.0))), 0.0, 1.0);
+    float indirect = clamp(dot(normal, normalize(abs(sunDirection))), 0.0, 1.0);
+
+    //when sun rising and setting adjunst brightness and redness up and down
+
+    if(sunPosition.y < 2.0) {
+       sun = sun * sunPosition.y/2.0;
+       sunColor.r = sunColor.r + (2.0 - sunPosition.y);
+    }
+    if(sunPosition.y < 0.0) {
+       sun = 0.0;
+    }
+
+    vec3 intensity = sun*sunColor
+                    + sky * skyColor
+                    + indirect * indirectColor;
+
+    color = color * intensity;
+
+}
+
 
 
 
@@ -583,7 +614,8 @@ void initLighting() {
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     v2ScreenPos = pixelToScreenPos(fragCoord);
     initLighting();
-    fragColor = backgroundColor();
+    vec3 color = backgroundColor();
+    vec3 normal;
 
     //set up
     initSdfs();
@@ -592,18 +624,30 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     float maxT = 100.0;
     int maxIterations = 100;
     float t;
+    int sdfIndex;
 
-     for(int i = 0; i < numObjects; i++) {
+
+    for(int i = 0; i < numObjects; i++) {
         t = rayMarch(sdfs[i], ray, maxIterations, maxT);
         if( t < maxT) {
-            //get the diffuse term
-            fragColor = getTextureColor(sdfs[i], v3Eye + ray*t, v2ScreenPos);
+            vec3 point = v3Eye + ray*t;
             maxT = t;
+            sdfIndex = i;
+        }
+    }
+
+    //go get the color
+    if(t < 100.0) {
+        vec3 point = v3Eye + ray*t;
+        color = getTextureColor(sdfs[sdfIndex], point);
+        normal = getNormal(sdfs[sdfIndex], point, v2ScreenPos);
+        if(sdfIndex > 0) {
+            adjustColorForLights(color, normal, point);
         }
     }
 
     //gamma correction
-    fragColor = vec4(pow(fragColor.rgb, vec3(1.0/2.2)), 1.0);
+    fragColor = vec4(pow(color, vec3(1.0/2.2)), 1.0);
 
 }
 
