@@ -18,7 +18,7 @@ out vec4 out_Col;
 
 const float sceneRadius = 100.0;
 const float distanceThreshold = 0.001;
-const int numObjects = 7;
+const int numObjects = 4;
 
 float sunSpeed = 1.0;
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
@@ -326,8 +326,8 @@ float petalsSDF(sdfParams params, vec3 point) {
        //get random value for adjusting placement/length
        float adjust = random1(params2.center, vec3(1,2,3))-0.5;
        float angle = float(i) * 2.0*pi/float(numPetals) + adjust*0.15;
-       params2.center.x = params.center.x + cos(angle)*0.7;
-       params2.center.y = params.center.y + sin(angle)*0.7;;
+       params2.center.x = cos(angle)*0.7;
+       params2.center.y = sin(angle)*0.7;;
        params2.rotation = rotateZ(angle);
        //adjust the petal length
        params2.extraVec3Val.x += (random1(params2.center, vec3(1,2,3))-0.5)*0.2;
@@ -392,23 +392,23 @@ vec3 sunColor(sdfParams params, vec3 point) {
 ////////////////////////////////////////// SEEDS ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 float seedHeightOffset(sdfParams params, vec3 point) {
-    vec3 p = point - params.center;
 
     float g = 80.0;
     float dist = (0.5 - length(point.xy)) * 2.0;
     mat3 rot = mat3(cos(-dist), -sin(-dist), 0.0,
                     sin(-dist), cos(dist),  0.0,
                     0.0,       0.0,        1.0);
-    p = rot * p;
-    return (2.0 + abs(sin(p.y * g))+abs(cos(p.x * g)))/4.0;
+    point = rot * point;
+    return (2.0 + abs(sin(point.y * g))+abs(cos(point.x * g)))/4.0;
 }
+
 float hemisphere(sdfParams params, vec3 point) {
-    return point.z-0.97;
+    return point.z-0.92;
 }
 
 float seedsSDF(sdfParams params, vec3 point) {
     vec3 p = point - params.center;
-    p.z += .97;
+    p.z += 0.9;
 
     float height = seedHeightOffset(params, p) / 25.0;
 
@@ -424,8 +424,9 @@ vec3 sphereNormal(sdfParams params, vec3 point) {
 
 vec3 seedColor(sdfParams params, vec3 point) {
     vec3 p = point - params.center;
+    p.z += 0.9;
     float height = seedHeightOffset(params, p);
-    return vec3(1.0, 1.0, 0.0) * height;
+    return vec3(1.0, 1.0, 0.0); //* height;
 }
 
 
@@ -715,18 +716,18 @@ void initSdfs() {
 
     if(numObjects > 4) {
         //seeds
-        sdfs[4].sdfType = 1;
-        sdfs[4].center = vec3(2.0,0,-0.3);
-        sdfs[4].radius = 1.0;
-        sdfs[4].color = vec3(0.0, 0.0, 1.0);
+        sdfs[numObjects - 2].sdfType = 1;
+        sdfs[numObjects - 2].center = vec3(2.0,0,-0.3);
+        sdfs[numObjects - 2].radius = 1.0;
+        sdfs[numObjects - 2].color = vec3(0.0, 0.0, 1.0);
 
         //row of petals
-        sdfs[5].sdfType = 2;
-        sdfs[5].center = vec3(2.0,0,-0.25);
-        sdfs[5].radius = 1.0;
-        sdfs[5].color = vec3(1.0, 1.0, 0.0);
-        sdfs[5].extraVec3Val = vec3(0.5,0.1,0.005);
-        sdfs[5].rotation = rotateZ(pi/4.0);
+        sdfs[numObjects -1].sdfType = 2;
+        sdfs[numObjects -1].center = vec3(2.0,0,-0.25);
+        sdfs[numObjects -1].radius = 1.0;
+        sdfs[numObjects -1].color = vec3(1.0, 1.0, 0.0);
+        sdfs[numObjects -1].extraVec3Val = vec3(0.5,0.1,0.005);
+        sdfs[numObjects -1].rotation = rotateZ(pi/4.0);
     }
 }
 
@@ -737,7 +738,7 @@ void initSdfs() {
 ////////////////////////////////////////////////////////////////////////////////////////////
 void initLighting() {
     float timeScale = 0.05;
-    float time = 55.0;
+    float time = 40.0;
     //time = iTime;
     sunPosition = 80.0 * vec3(-cos(time * sunSpeed *timeScale)/4.0,
                        sin(time * sunSpeed * timeScale),
