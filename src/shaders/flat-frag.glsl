@@ -476,11 +476,13 @@ float rayMarch(
 
         if(distance < closestDistance) {
              closestDistance = distance;
+             closestT = t;
         }
 
         //if distance < some epsilon we are done
         if(distance < distanceThreshold) {
             closestDistance = t;
+            closestT = t;
             return t;
         }
 
@@ -507,6 +509,7 @@ void rayMarchWorld(
 
     int maxIterations = 100;
     float cDistance;
+    float cT;
 
     t = maxT;
     minClosestDistance = sceneRadius * 2.0;
@@ -514,13 +517,14 @@ void rayMarchWorld(
 
     for(int i = 0; i < numObjects; i++) {
         params = sdfs[i];
-        float objectT = rayMarch(params, ray, origin, maxIterations, minT, t, cDistance, minClosestT);
+        float objectT = rayMarch(params, ray, origin, maxIterations, minT, t, cDistance, cT);
         if( objectT < t) { //must have hit an object closer than the previous
             sdfIndex = i;
             t = objectT;
         }
         if(cDistance < minClosestDistance) {
             minClosestDistance = cDistance;
+            minClosestT = cT;
         }
         if(i == 0 && origin == v3Eye) {
             sunBloomDistance = cDistance;
@@ -562,20 +566,24 @@ vec3 getNormalFromRays(sdfParams params, vec2 fragCoord) {
 ////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// Shadwos   ////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
-float shadow(vec3 point, float minT, float maxT, float k) {
+float sunShadow(vec3 point, float k) {
     vec3 ray = normalize(sunPosition - point);
-    float sunDistance = length(sunPosition - point) - sdfs[0].radius - 1.0;
+    float sunDistance = length(sunPosition - point) / 2.0;
     float minClosestDistance;
     float t;
+    float minT = 0.05;
     float minClosestT;
     int sdfIndex;
 
     rayMarchWorld(point, ray, minT, sunDistance, t, minClosestDistance, minClosestT, sdfIndex);
     if( t < sunDistance ) return 0.0;
 
+    if(sdfIndex == 0) return 1.0;
 
 
-    return 1.0;
+    //try to remove eclipsing
+    return k * minClosestDistance / minClosestT;
+
 }
 
 
@@ -594,10 +602,6 @@ vec3 getNormal(sdfParams params, vec3 point, vec2 fragCoord) {
 
 
 vec3 getTextureColor(sdfParams params, vec3 point) {
-    vec3 normal;
-    vec3 color;
-    vec3 lightDirection = normalize(sunPosition - point);
-    float intensity;
 
     switch(params.sdfType) {
         case 0: return sunColor(params, point);
@@ -629,19 +633,30 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point) {
     vec3 skyColor = vec3(0.08,0.10,0.14);
     vec3 indirectColor = vec3(0.04, 0.028, 0.020);
 
+
+    //get the soft shadow
+    float shadow;
+    if(dot(normal, sunDirection) < 0.0) {
+        shadow = -1.0;
+    }
+    else {
+        shadow = pow(sunShadow(point, 3.0), 1.2);
+    }
+
+
     //get three light intensities
-    float sun = clamp(dot(normal, sunDirection), 0.0, 1.0);
+    float sun = clamp(dot(normal, sunDirection), 0.0, 1.0) * shadow;
     float sky = clamp(0.5 + 0.5*normal.y, 0.0, 1.0);
     //float indirect = clamp(dot(normal, normalize(sunDirection * vec3(-1.0, 0.0, -1.0))), 0.0, 1.0);
     float indirect = clamp(dot(normal, normalize(abs(sunDirection))), 0.0, 1.0);
-
-    //when sun rising and setting adjunst brightness and redness up and down
 
 
 
     //make sun brighter at noon
     sun = sun * sunPosition.y/80.0;
 
+
+    //make sun redder at sunset
     if(sunPosition.x > 0.0 && sunPosition.y < 35.0)  {
         sunColor.r = sunColor.r + (35.0 - sunPosition.y)/25.0;
     }
@@ -722,8 +737,8 @@ void initSdfs() {
 ////////////////////////////////////////////////////////////////////////////////////////////
 void initLighting() {
     float timeScale = 0.05;
-    float time = 330.0;
-    time = iTime;
+    float time = 55.0;
+    //time = iTime;
     sunPosition = 80.0 * vec3(-cos(time * sunSpeed *timeScale)/4.0,
                        sin(time * sunSpeed * timeScale),
                        -cos(time * sunSpeed * timeScale)/2.0);
