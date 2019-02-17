@@ -447,8 +447,17 @@ float objectDistance(sdfParams params, vec3 point, float maxDistance) {
 }
 
 
-float rayMarch(sdfParams params, vec3 ray, vec3 origin, int maxIterations, float maxT, out float closestDistance) {
-    float t = 0.0;
+float rayMarch(
+    sdfParams params,
+    vec3 ray,
+    vec3 origin,
+    int maxIterations,
+    float minT,
+    float maxT,
+    out float closestDistance,
+    out float closestT
+) {
+    float t = minT;
     vec3 rayPos;
     float distance;
     int iterations = 0;
@@ -485,7 +494,16 @@ float rayMarch(sdfParams params, vec3 ray, vec3 origin, int maxIterations, float
 
 
 
-void rayMarchWorld(vec3 origin, vec3 ray, float maxT, out float t, out float minClosestDistance, out int sdfIndex) {
+void rayMarchWorld(
+    vec3 origin,
+    vec3 ray,
+    float minT,
+    float maxT,
+    out float t,
+    out float minClosestDistance,
+    out float minClosestT,
+    out int sdfIndex
+) {
 
     int maxIterations = 100;
     float cDistance;
@@ -496,7 +514,7 @@ void rayMarchWorld(vec3 origin, vec3 ray, float maxT, out float t, out float min
 
     for(int i = 0; i < numObjects; i++) {
         params = sdfs[i];
-        float objectT = rayMarch(params, ray, origin, maxIterations, t, cDistance);
+        float objectT = rayMarch(params, ray, origin, maxIterations, minT, t, cDistance, minClosestT);
         if( objectT < t) { //must have hit an object closer than the previous
             sdfIndex = i;
             t = objectT;
@@ -518,16 +536,17 @@ void rayMarchWorld(vec3 origin, vec3 ray, float maxT, out float t, out float min
 vec3 getNormalFromRays(sdfParams params, vec2 fragCoord) {
     float aspect = iResolution.x / iResolution.y;
     float closestDistance;
+    float closestT;
     //calculate the points for 4 surrounding rays
     vec3 ray1 = getRay(v3Up, v3Eye, v3Ref, aspect, fragCoord + vec2(-0.001,  0.0));
     vec3 ray2 = getRay(v3Up, v3Eye, v3Ref, aspect, fragCoord + vec2( 0.001,  0.0));
     vec3 ray3 = getRay(v3Up, v3Eye, v3Ref, aspect, fragCoord + vec2( 0.00, -0.001));
     vec3 ray4 = getRay(v3Up, v3Eye, v3Ref, aspect, fragCoord + vec2( 0.00,  0.001));
 
-    float t1 =  rayMarch(params, ray1, v3Eye, 100, sceneRadius, closestDistance);
-    float t2 =  rayMarch(params, ray2, v3Eye, 100, sceneRadius, closestDistance);
-    float t3 =  rayMarch(params, ray3, v3Eye, 100, sceneRadius, closestDistance);
-    float t4 =  rayMarch(params, ray4, v3Eye, 100, sceneRadius, closestDistance);
+    float t1 =  rayMarch(params, ray1, v3Eye, 100, 0.0, sceneRadius, closestDistance, closestT);
+    float t2 =  rayMarch(params, ray2, v3Eye, 100, 0.0, sceneRadius, closestDistance, closestT);
+    float t3 =  rayMarch(params, ray3, v3Eye, 100, 0.0, sceneRadius, closestDistance, closestT);
+    float t4 =  rayMarch(params, ray4, v3Eye, 100, 0.0, sceneRadius, closestDistance, closestT);
 
     vec3 p1 = v3Eye + ray1 * t1;
     vec3 p2 = v3Eye + ray2 * t2;
@@ -539,6 +558,25 @@ vec3 getNormalFromRays(sdfParams params, vec2 fragCoord) {
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// Shadwos   ////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+float shadow(vec3 point, float minT, float maxT, float k) {
+    vec3 ray = normalize(sunPosition - point);
+    float sunDistance = length(sunPosition - point) - sdfs[0].radius - 1.0;
+    float minClosestDistance;
+    float t;
+    float minClosestT;
+    int sdfIndex;
+
+    rayMarchWorld(point, ray, minT, sunDistance, t, minClosestDistance, minClosestT, sdfIndex);
+    if( t < sunDistance ) return 0.0;
+
+
+
+    return 1.0;
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -694,6 +732,8 @@ void initLighting() {
 
 
 
+
+
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     v2ScreenPos = pixelToScreenPos(fragCoord);
     initLighting();
@@ -702,14 +742,15 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     //set up
     initSdfs();
 
-    float closestDistance;
+    float minClosestDistance;
+    float minClosestT;
     float t;
     int sdfIndex;
     vec3 point;
 
 
     vec3 ray= getRay(v3Up, v3Eye, v3Ref, iResolution.x/iResolution.y, v2ScreenPos) ;
-    rayMarchWorld(v3Eye, ray, sceneRadius, t, closestDistance, sdfIndex);
+    rayMarchWorld(v3Eye, ray, 0.1, sceneRadius, t, minClosestDistance, minClosestT, sdfIndex);
     point = v3Eye + ray * t;
 
     vec3 color = backgroundColor();
