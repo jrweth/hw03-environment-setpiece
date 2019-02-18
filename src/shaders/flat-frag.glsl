@@ -18,7 +18,9 @@ out vec4 out_Col;
 
 const float sceneRadius = 100.0;
 const float distanceThreshold = 0.001;
-const int numObjects = 7;
+
+const int numFlowers = 3;
+const int numObjects = 10; //should be num flowers * 3 + 1
 
 float sunSpeed = 1.0;
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
@@ -694,57 +696,47 @@ void initSdfs() {
     sdfs[0].color = vec3(1.0, 1.0, 0.5);
 
 
-    //seeds
-    vec3 flowerCenter = vec3(0.3, 0.0, -0.6);
-    mat3 flowerRotation = rotateY(pi/6.0);
-    sdfs[1].sdfType = 1;
-    sdfs[1].center = flowerCenter;
-    sdfs[1].radius = 1.0;
-    sdfs[1].color = vec3(0.0, 0.0, 1.0);
-    sdfs[1].rotation = flowerRotation;
+    vec3 flowerCenter;
+    mat3 flowerRotation;
+    for(int i = 0; i < numFlowers; i++) {
+        switch (i) {
+            case 0:
+                flowerCenter = vec3(0.3, 0.0, -0.6);
+                flowerRotation = rotateY(pi/6.0);
+                break;
+            case 1:
+                 flowerCenter = vec3(-2.0, 0.0, -2.0);
+                 flowerRotation = rotateY(-pi/6.0);
+                break;
+            case 2:
+                flowerCenter = vec3(-1.1, 2.0, -3.0);
+                flowerRotation = rotateY(0.0);
+                break;
+        }
 
-
-    //row of petals
-    sdfs[2].sdfType = 2;
-    sdfs[2].center = flowerCenter;
-    sdfs[2].radius = 1.0;
-    sdfs[2].color = vec3(1.0, 1.0, 0.0);
-    sdfs[2].extraVec3Val = vec3(0.5,0.1,0.005);
-    sdfs[2].rotation = flowerRotation;
-
-    //2nd row of petals
-    sdfs[3].sdfType = 2;
-    sdfs[3].center = flowerCenter + vec3(0.0, 0.0, -0.03);
-    sdfs[3].radius = 1.0;
-    sdfs[3].color = vec3(1.0, 1.0, 0.0);
-    sdfs[3].extraVec3Val = vec3(0.5,0.1,0.005);
-    sdfs[3].rotation = rotateZ(pi/4.0) * flowerRotation;
-
-    if(numObjects > 4) {
-        vec3 flowerCenter = vec3(-2.0, 0.0, -2.0);
-        mat3 flowerRotation = rotateY(-pi/6.0);
         //seeds
-        sdfs[numObjects - 3].sdfType = 1;
-        sdfs[numObjects - 3].center = flowerCenter;
-        sdfs[numObjects - 3].radius = 1.0;
-        sdfs[numObjects - 3].color = vec3(0.0, 0.0, 1.0);
-        sdfs[numObjects - 3].rotation = flowerRotation;
+        sdfs[i*3 + 1].sdfType = 1;
+        sdfs[i*3 + 1].center = flowerCenter;
+        sdfs[i*3 + 1].radius = 1.0;
+        sdfs[i*3 + 1].color = vec3(0.0, 0.0, 1.0);
+        sdfs[i*3 + 1].rotation = flowerRotation;
+
 
         //row of petals
-        sdfs[numObjects -2].sdfType = 2;
-        sdfs[numObjects -2].center = flowerCenter;
-        sdfs[numObjects -2].radius = 1.0;
-        sdfs[numObjects -2].color = vec3(1.0, 1.0, 0.0);
-        sdfs[numObjects -2].extraVec3Val = vec3(0.5,0.1,0.005);
-        sdfs[numObjects -2].rotation = flowerRotation;
+        sdfs[i*3 + 2].sdfType = 2;
+        sdfs[i*3 + 2].center = flowerCenter;
+        sdfs[i*3 + 2].radius = 1.0;
+        sdfs[i*3 + 2].color = vec3(1.0, 1.0, 0.0);
+        sdfs[i*3 + 2].extraVec3Val = vec3(0.5,0.1,0.005);
+        sdfs[i*3 + 2].rotation = flowerRotation;
 
-        //petals
-        sdfs[numObjects - 1].sdfType = 2;
-        sdfs[numObjects - 1].center = flowerCenter + vec3(0.0, 0.0, -0.03);
-        sdfs[numObjects - 1].radius = 1.0;
-        sdfs[numObjects - 1].color = vec3(1.0, 1.0, 0.0);
-        sdfs[numObjects - 1].extraVec3Val = vec3(0.5,0.1,0.005);
-        sdfs[numObjects - 1].rotation = rotateZ(pi / 4.0) * flowerRotation;
+        //2nd row of petals
+        sdfs[i*3 + 3].sdfType = 2;
+        sdfs[i*3 + 3].center = flowerCenter + vec3(0.0, 0.0, -0.03);
+        sdfs[i*3 + 3].radius = 1.0;
+        sdfs[i*3 + 3].color = vec3(1.0, 1.0, 0.0);
+        sdfs[i*3 + 3].extraVec3Val = vec3(0.5,0.1,0.005);
+        sdfs[i*3 + 3].rotation = rotateZ(pi/4.0) * flowerRotation;
     }
 }
 
@@ -755,8 +747,8 @@ void initSdfs() {
 ////////////////////////////////////////////////////////////////////////////////////////////
 void initLighting() {
     float timeScale = 0.005;
-    float time = 40.0;
-    time = iTime;
+    float time = 500.0;
+    //time = iTime;
     sunPosition = 80.0 * vec3(-cos(time * sunSpeed *timeScale)/4.0,
                        sin(time * sunSpeed * timeScale),
                        -cos(time * sunSpeed * timeScale)/2.0);
