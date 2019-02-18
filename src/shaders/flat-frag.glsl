@@ -18,7 +18,7 @@ out vec4 out_Col;
 
 const float sceneRadius = 100.0;
 const float distanceThreshold = 0.001;
-const int numObjects = 4;
+const int numObjects = 7;
 
 float sunSpeed = 1.0;
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
@@ -324,14 +324,15 @@ float petalsSDF(sdfParams params, vec3 point) {
 
     for(int i = 0; i < numPetals; i++) {
        //get random value for adjusting placement/length
-       float adjust = random1(params2.center, vec3(1,2,3))-0.5;
+       float adjust = random1(vec3(float(i), params.center.zy), vec3(1,2,3)) - 0.5;
        float angle = float(i) * 2.0*pi/float(numPetals) + adjust*0.15;
        params2.center.x = cos(angle)*0.7;
-       params2.center.y = sin(angle)*0.7;;
+       params2.center.y = sin(angle)*0.7;
+       params2.center.z = 0.0;
        params2.rotation = rotateZ(angle);
        //adjust the petal length
        params2.extraVec3Val.x += (random1(params2.center, vec3(1,2,3))-0.5)*0.2;
-       params2.extraVec3Val.y += (random1(params2.center, vec3(1,2,3))-0.5)*0.05;
+       params2.extraVec3Val.y += (random1(params2.center, vec3(1,2,3))-0.5)*0.04;
        petalMin = min(petalMin, petalSDF(params2, p));
     }
     return petalMin;
@@ -403,12 +404,12 @@ float seedHeightOffset(sdfParams params, vec3 point) {
 }
 
 float hemisphere(sdfParams params, vec3 point) {
-    return point.z-0.92;
+    return point.z-0.95;
 }
 
 float seedsSDF(sdfParams params, vec3 point) {
     vec3 p = point - params.center;
-    p.z += 0.9;
+    p.z += 0.83;
 
     float height = seedHeightOffset(params, p) / 25.0;
 
@@ -424,7 +425,7 @@ vec3 sphereNormal(sdfParams params, vec3 point) {
 
 vec3 seedColor(sdfParams params, vec3 point) {
     vec3 p = point - params.center;
-    p.z += 0.9;
+    p.z += 0.95;
     float height = seedHeightOffset(params, p);
     return vec3(1.0, 1.0, 0.0); //* height;
 }
@@ -692,15 +693,16 @@ void initSdfs() {
 
 
     //seeds
+    vec3 flowerCenter = vec3(0.3, 0.0, -0.6);
     sdfs[1].sdfType = 1;
-    sdfs[1].center = vec3(0,0,-0.3);
+    sdfs[1].center = flowerCenter;
     sdfs[1].radius = 1.0;
     sdfs[1].color = vec3(0.0, 0.0, 1.0);
 
 
     //row of petals
     sdfs[2].sdfType = 2;
-    sdfs[2].center = vec3(0,0,-0.25);
+    sdfs[2].center = flowerCenter;
     sdfs[2].radius = 1.0;
     sdfs[2].color = vec3(1.0, 1.0, 0.0);
     sdfs[2].extraVec3Val = vec3(0.5,0.1,0.005);
@@ -708,26 +710,35 @@ void initSdfs() {
 
     //petals
     sdfs[3].sdfType = 2;
-    sdfs[3].center = vec3(0,0,-0.2);
+    sdfs[3].center = flowerCenter + vec3(0.0, 0.0, -0.03);
     sdfs[3].radius = 1.0;
     sdfs[3].color = vec3(1.0, 1.0, 0.0);
     sdfs[3].extraVec3Val = vec3(0.5,0.1,0.005);
     sdfs[3].rotation = rotateZ(0.0);
 
     if(numObjects > 4) {
+        vec3 flowerCenter = vec3(-2.0, 0.0, -2.0);
         //seeds
-        sdfs[numObjects - 2].sdfType = 1;
-        sdfs[numObjects - 2].center = vec3(2.0,0,-0.3);
-        sdfs[numObjects - 2].radius = 1.0;
-        sdfs[numObjects - 2].color = vec3(0.0, 0.0, 1.0);
+        sdfs[numObjects - 3].sdfType = 1;
+        sdfs[numObjects - 3].center = flowerCenter;
+        sdfs[numObjects - 3].radius = 1.0;
+        sdfs[numObjects - 3].color = vec3(0.0, 0.0, 1.0);
 
         //row of petals
-        sdfs[numObjects -1].sdfType = 2;
-        sdfs[numObjects -1].center = vec3(2.0,0,-0.25);
-        sdfs[numObjects -1].radius = 1.0;
-        sdfs[numObjects -1].color = vec3(1.0, 1.0, 0.0);
-        sdfs[numObjects -1].extraVec3Val = vec3(0.5,0.1,0.005);
-        sdfs[numObjects -1].rotation = rotateZ(pi/4.0);
+        sdfs[numObjects -2].sdfType = 2;
+        sdfs[numObjects -2].center = flowerCenter;
+        sdfs[numObjects -2].radius = 1.0;
+        sdfs[numObjects -2].color = vec3(1.0, 1.0, 0.0);
+        sdfs[numObjects -2].extraVec3Val = vec3(0.5,0.1,0.005);
+        sdfs[numObjects -2].rotation = rotateZ(pi/4.0);
+
+        //petals
+        sdfs[numObjects - 1].sdfType = 2;
+        sdfs[numObjects - 1].center = flowerCenter + vec3(0.0, 0.0, -0.03);
+        sdfs[numObjects - 1].radius = 1.0;
+        sdfs[numObjects - 1].color = vec3(1.0, 1.0, 0.0);
+        sdfs[numObjects - 1].extraVec3Val = vec3(0.5,0.1,0.005);
+        sdfs[numObjects - 1].rotation = rotateZ(0.0);
     }
 }
 
@@ -737,9 +748,9 @@ void initSdfs() {
 ////////////////////////////////////////// Lighting ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 void initLighting() {
-    float timeScale = 0.05;
+    float timeScale = 0.005;
     float time = 40.0;
-    //time = iTime;
+    time = iTime;
     sunPosition = 80.0 * vec3(-cos(time * sunSpeed *timeScale)/4.0,
                        sin(time * sunSpeed * timeScale),
                        -cos(time * sunSpeed * timeScale)/2.0);
