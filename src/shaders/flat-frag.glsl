@@ -408,7 +408,8 @@ float hemisphere(sdfParams params, vec3 point) {
 }
 
 float seedsSDF(sdfParams params, vec3 point) {
-    vec3 p = point - params.center;
+    vec3 p = params.rotation * (point - params.center);
+    //vec3 p = point - params.center;
     p.z += 0.83;
 
     float height = seedHeightOffset(params, p) / 25.0;
@@ -424,7 +425,8 @@ vec3 sphereNormal(sdfParams params, vec3 point) {
 
 
 vec3 seedColor(sdfParams params, vec3 point) {
-    vec3 p = point - params.center;
+    vec3 p = params.rotation * (point - params.center);
+    //vec3 p = point - params.center;
     p.z += 0.95;
     float height = seedHeightOffset(params, p);
     return vec3(1.0, 1.0, 0.0); //* height;
@@ -694,10 +696,12 @@ void initSdfs() {
 
     //seeds
     vec3 flowerCenter = vec3(0.3, 0.0, -0.6);
+    mat3 flowerRotation = rotateY(pi/6.0);
     sdfs[1].sdfType = 1;
     sdfs[1].center = flowerCenter;
     sdfs[1].radius = 1.0;
     sdfs[1].color = vec3(0.0, 0.0, 1.0);
+    sdfs[1].rotation = flowerRotation;
 
 
     //row of petals
@@ -706,23 +710,25 @@ void initSdfs() {
     sdfs[2].radius = 1.0;
     sdfs[2].color = vec3(1.0, 1.0, 0.0);
     sdfs[2].extraVec3Val = vec3(0.5,0.1,0.005);
-    sdfs[2].rotation = rotateZ(pi/4.0);
+    sdfs[2].rotation = flowerRotation;
 
-    //petals
+    //2nd row of petals
     sdfs[3].sdfType = 2;
     sdfs[3].center = flowerCenter + vec3(0.0, 0.0, -0.03);
     sdfs[3].radius = 1.0;
     sdfs[3].color = vec3(1.0, 1.0, 0.0);
     sdfs[3].extraVec3Val = vec3(0.5,0.1,0.005);
-    sdfs[3].rotation = rotateZ(0.0);
+    sdfs[3].rotation = rotateZ(pi/4.0) * flowerRotation;
 
     if(numObjects > 4) {
         vec3 flowerCenter = vec3(-2.0, 0.0, -2.0);
+        mat3 flowerRotation = rotateY(-pi/6.0);
         //seeds
         sdfs[numObjects - 3].sdfType = 1;
         sdfs[numObjects - 3].center = flowerCenter;
         sdfs[numObjects - 3].radius = 1.0;
         sdfs[numObjects - 3].color = vec3(0.0, 0.0, 1.0);
+        sdfs[numObjects - 3].rotation = flowerRotation;
 
         //row of petals
         sdfs[numObjects -2].sdfType = 2;
@@ -730,7 +736,7 @@ void initSdfs() {
         sdfs[numObjects -2].radius = 1.0;
         sdfs[numObjects -2].color = vec3(1.0, 1.0, 0.0);
         sdfs[numObjects -2].extraVec3Val = vec3(0.5,0.1,0.005);
-        sdfs[numObjects -2].rotation = rotateZ(pi/4.0);
+        sdfs[numObjects -2].rotation = flowerRotation;
 
         //petals
         sdfs[numObjects - 1].sdfType = 2;
@@ -738,7 +744,7 @@ void initSdfs() {
         sdfs[numObjects - 1].radius = 1.0;
         sdfs[numObjects - 1].color = vec3(1.0, 1.0, 0.0);
         sdfs[numObjects - 1].extraVec3Val = vec3(0.5,0.1,0.005);
-        sdfs[numObjects - 1].rotation = rotateZ(0.0);
+        sdfs[numObjects - 1].rotation = rotateZ(pi / 4.0) * flowerRotation;
     }
 }
 
