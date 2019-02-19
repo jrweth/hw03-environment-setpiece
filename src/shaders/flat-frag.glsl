@@ -23,13 +23,13 @@ const int numObjects = 10; //should be num flowers * 3 + 1
 
 
 // The larger the DISTORTION, the smaller the glow
-const float DISTORTION = 0.02;
+const float DISTORTION = 12.0;
 // The higher GLOW is, the smaller the glow of the subsurface scattering
-const float GLOW = 12.0;
+const float GLOW = 1.0;
 // The higher the BSSRDF_SCALE, the brighter the scattered light
 const float BSSRDF_SCALE = 1.0;
 // Boost the shadowed areas in the subsurface glow with this
-const float AMBIENT = 0.0;
+const float AMBIENT = 10.0;
 // Toggle this to affect how easily the subsurface glow propagates through an object
 #define ATTENUATION 0
 
@@ -536,13 +536,14 @@ void rayMarchWorld(
     sdfParams params;
 
     for(int i = 0; i < numObjects; i++) {
+        if(i == excludeSdfIndex) continue;
         params = sdfs[i];
         float objectT = rayMarch(params, ray, origin, maxIterations, minT, t, cDistance, cT);
         if( objectT < t) { //must have hit an object closer than the previous
             sdfIndex = i;
             t = objectT;
         }
-        if(cDistance < minClosestDistance) {
+        if(cDistance < minClosestDistance && i != excludeSdfForClosest) {
             minClosestDistance = cDistance;
             minClosestT = cT;
         }
@@ -595,7 +596,7 @@ float sunShadow(vec3 point, float k, int sdfIndex) {
     float minClosestT;
     int shadowingSdfIndex;
 
-    rayMarchWorld(point, ray, minT, sunDistance, -1, -1, t, minClosestDistance, minClosestT, shadowingSdfIndex);
+    rayMarchWorld(point, ray, minT, sunDistance, -1, sdfIndex, t, minClosestDistance, minClosestT, shadowingSdfIndex);
     if( t < sunDistance ) return 0.0;
 
     if(sdfIndex == 0) return 1.0;
@@ -612,6 +613,8 @@ float subsurface(vec3 lightDir, vec3 normal, vec3 viewVec, float thinness) {
     vec3 scatteredLightDir = lightDir + normal * DISTORTION;
     float lightReachingEye = pow(clamp(dot(viewVec, -scatteredLightDir), 0.0, 1.0), GLOW) * BSSRDF_SCALE;
 	float totalLight = lightReachingEye;// * thinness;
+
+
     return totalLight;
 }
 
@@ -651,15 +654,21 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfInde
 
 
     //get the soft shadow and subsurface amounts
-    float shadow = pow(sunShadow(point, 3.0, sdfIndex), 1.2);
+    float shadow = sunShadow(point, 3.0, sdfIndex);
     float sunIntensity;
     if(dot(normal, sunDirection) >= 0.0) {
         sunIntensity = clamp(dot(normal, sunDirection), 0.0, 1.0) * shadow;
     }
     else {
         //get the glow for the petals
-        if(sdfs[sdfIndex].sdfType == 2) {
+//        if(false) {
+        if(sdfs[sdfIndex].sdfType == 2 ) {
             sunIntensity = subsurface(-sunDirection, normal, normalize(point - v3Eye), 0.01);
+
+            //make subface only apply in in evening
+            sunIntensity = sunIntensity * clamp(-sunPosition.z/80.0, 0.0, 1.0);
+
+            //account for the shadows
             sunIntensity = sunIntensity * shadow;
         }
         else {
@@ -676,7 +685,7 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfInde
 
 
     //make sun brighter at noon
-    sunIntensity = sunIntensity * sunPosition.y/80.0;
+    sunIntensity = sunIntensity * clamp(sunPosition.y/80.0, 0.0, 1.0);
 
 
     //make sun redder at sunset
@@ -726,7 +735,7 @@ void initSdfs() {
                  flowerRotation = rotateY(-pi/6.0);
                 break;
             case 2:
-                flowerCenter = vec3(-1.1, 2.0, -3.0);
+                flowerCenter = vec3(-1.1, 2.2, -3.0);
                 flowerRotation = rotateY(0.0);
                 break;
         }
@@ -763,10 +772,10 @@ void initSdfs() {
 ////////////////////////////////////////// Lighting ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 void initLighting() {
-    float timeScale = 0.05;
-    float time = 60.0;
-    //time = iTime;
-    sunPosition = 80.0 * vec3(cos(time * sunSpeed *timeScale)/4.0,
+    float timeScale = 0.005;
+    float time = 600.0;
+    time = iTime;
+    sunPosition = 80.0 * vec3(cos(time * sunSpeed *timeScale)/2.5,
                        sin(time * sunSpeed * timeScale),
                        cos(time * sunSpeed * timeScale)/2.0);
 }
