@@ -732,7 +732,7 @@ void initSdfs() {
 
         //2nd row of petals
         sdfs[i*3 + 3].sdfType = 2;
-        sdfs[i*3 + 3].center = flowerCenter + vec3(0.0, 0.0, -0.03);
+        sdfs[i*3 + 3].center = flowerCenter + flowerRotation * vec3(0.0, 0.0, -0.03);
         sdfs[i*3 + 3].radius = 1.0;
         sdfs[i*3 + 3].color = vec3(1.0, 1.0, 0.0);
         sdfs[i*3 + 3].extraVec3Val = vec3(0.5,0.1,0.005);
