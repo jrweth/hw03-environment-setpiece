@@ -3,7 +3,7 @@ const int  samples    = 15;  // must be odd
 const int  samplesHalf = samples / 2;
 
 float focalLength = 3.2;
-float focalRange = 0.2;
+float focalRange = 0.4;
 float sigma = 3.0;
 
 
@@ -20,7 +20,7 @@ vec3 BlurredPixel (in vec2 uv) {
         return color.rgb;
     }
 
-    float len = clamp(abs(color.a - focalLength), 0.0, 1.5)/iResolution.x;
+    float len = clamp(abs(color.a - focalLength)*0.15, 0.0, 1.5)/iResolution.x;
     vec3 ret = vec3(0.0);
     float total = 0.0;
     for(int xi = -samplesHalf; xi <= samplesHalf; xi++) {

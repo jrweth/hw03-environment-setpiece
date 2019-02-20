@@ -18,14 +18,25 @@ out vec4 out_Col;
 
 const float sceneRadius = 100.0;
 const float distanceThreshold = 0.001;
-const int numFlowers = 3;
-const int numObjects = 13; //should be num flowers * 4 + 1
+const int numFlowers = 5;
+const int numObjects = 21; //should be num flowers * 4 + 1
 const float timeScale = 0.005;
 
 const float sunOrbit = 80.0;
 const float horizon = 0.0;
 const float midSky = 15.0;
 
+float sunSpeed = 5.0;
+float night;
+float noon;
+float sunset;
+float dawn;
+
+
+vec3 v3Up = vec3(0.0, 1.0, 0.0);
+vec3 v3Ref = vec3(0.0, 0.0, 0.0);
+vec3 v3Eye = vec3(0.0, 0.0, 4.0);
+vec3 sunPosition = vec3(5.0,10.0,10.0);
 
 // The larger the DISTORTION, the smaller the glow
 const float DISTORTION = 12.0;
@@ -38,18 +49,8 @@ const float AMBIENT = 10.0;
 // Toggle this to affect how easily the subsurface glow propagates through an object
 #define ATTENUATION 0
 
+bool shaderToy = true;
 
-float sunSpeed = 1.0;
-float night;
-float noon;
-float sunset;
-float dawn;
-
-
-vec3 v3Up = vec3(0.0, 1.0, 0.0);
-vec3 v3Ref = vec3(0.0, 0.0, 0.0);
-vec3 v3Eye = vec3(0.0, 0.0, 4.0);
-vec3 sunPosition = vec3(5.0,10.0,10.0);
 
 vec3 mainRay;
 vec2 v2ScreenPos;
@@ -699,7 +700,7 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfInde
             sunIntensity = subsurface(-sunDirection, normal, normalize(point - v3Eye), 0.01);
 
             //make subsurface only apply in in evening
-            sunIntensity = sunIntensity * clamp(-sunPosition.z/80.0, 0.0, 1.0);
+            sunIntensity = sunIntensity * clamp(-sunPosition.z/sunOrbit, 0.0, 1.0);
 
             //account for the shadows
             sunIntensity = sunIntensity * shadow;
@@ -730,20 +731,8 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfInde
     //diminish indrect intensity at noon/midnight
     indirectIntensity = pow(mix(indirectIntensity, 0.0, abs(6.0 - mod(hour, 12.0))/6.0), 3.0);
 
-    //diminish sky intensity at night
-
-
-
-
-
-
     //make sun redder at sunrise/sunset
-    if(hour < 8.0)  {
-        sunColor.r = sunColor.r + (8.0 - hour)/4.0;
-    }
-    else if(hour > 16.0)  {
-        sunColor.r = sunColor.r + (hour - 16.0)/4.0;
-    }
+    sunColor.r = max(sunColor.r * 3.0 * (dawn*0.8 + sunset), sunColor.r);
     if(hour < 5.0) {
        sunIntensity = 0.0;
     }
@@ -788,14 +777,23 @@ void initSdfs() {
                 flowerRotation = rotateY(pi/8.0);
                 break;
             case 1:
-                 flowerCenter = vec3(-2.0, -0.2, -2.0);
+                 flowerCenter = vec3(-2.0, -0.0, -2.0);
                  flowerRotation = rotateY(-pi/6.0);
                 break;
             case 2:
                 flowerCenter = vec3(-1.1, 2.0, -3.0);
                 flowerRotation = rotateY(0.0);
                 break;
+            case 3:
+                flowerCenter = vec3(2.3, 0.0, 0.0);
+                flowerRotation = rotateY(pi/5.0);
+                break;
+            case 4:
+                flowerCenter = vec3(-2.3, -0.5, 0.2);
+                flowerRotation = rotateY(-pi/4.0);
+                break;
         }
+
 
         //seeds
         sdfs[i*4 + 1].sdfType = 1;
@@ -894,11 +892,20 @@ void initTiming() {
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     v2ScreenPos = pixelToScreenPos(fragCoord);
     initTiming();
-    vec3 normal;
+
+
+    //adjust camera position
+    float camChange = smoothstep(0.0, 1.0, abs(12.0-hour)/12.0);
+    v3Eye.z = 4.0 - camChange;
+    v3Eye.x = camChange;
+
+    v3Ref = mix(vec3(0,0,0), vec3(-1.0,0.0,-1.0), camChange *0.5);
+
 
     //set up
     initSdfs();
 
+    vec3 normal;
     float minClosestDistance;
     float minClosestT;
     float t;
@@ -923,7 +930,12 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
     //gamma correction
     color = max(color, 0.0);
-    fragColor = vec4(pow(color, vec3(1.0/2.2)), 1.0);
+    if(shaderToy) {
+        fragColor = vec4(pow(color, vec3(1.0/2.2)), t);
+    }
+    else {
+        fragColor = vec4(pow(color, vec3(1.0/2.2)), 1.0);
+    }
 
 
 }
@@ -933,5 +945,6 @@ void main() {
     vec2 fragCoord = screenToPixelPos(fs_Pos);
     v3Eye = u_Eye;
     mainImage(out_Col, fragCoord);
+    shaderToy = false;
 }
 
