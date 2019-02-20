@@ -19,7 +19,7 @@ out vec4 out_Col;
 const float sceneRadius = 100.0;
 const float distanceThreshold = 0.001;
 const int numFlowers = 3;
-const int numObjects = 10; //should be num flowers * 3 + 1
+const int numObjects = 13; //should be num flowers * 4 + 1
 const float timeScale = 0.005;
 
 const float sunOrbit = 80.0;
@@ -357,6 +357,23 @@ vec3 backgroundColor() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// SUN  ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+
+float sunSDF(sdfParams params, vec3 point) {
+    vec3 p = point - params.center;
+    return length(p) - params.radius;
+}
+
+vec3 sunColor(sdfParams params, vec3 point) {
+    if(v2ScreenPos.y < horizonHeight()) {
+        return backgroundColor();
+    }
+    return params.color;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// PETALS  ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -437,22 +454,6 @@ vec3 petalColor(sdfParams params, vec3 point) {
 }
 
 
-////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////// SUN  ////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////
-
-float sunSDF(sdfParams params, vec3 point) {
-    vec3 p = point - params.center;
-    return length(p) - params.radius;
-}
-
-vec3 sunColor(sdfParams params, vec3 point) {
-    if(v2ScreenPos.y < horizonHeight()) {
-        return backgroundColor();
-    }
-    return params.color;
-}
-
 
 
 
@@ -499,7 +500,28 @@ vec3 seedColor(sdfParams params, vec3 point) {
     return vec3(1.0, 1.0, 0.0); //* height;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// Stem ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+float stemSDF(sdfParams params, vec3 point) {
+   vec3 p = point - params.center;
 
+   //adjust a bit
+   p.x +=  params.radius * sin(point.y * 0.3)/0.2;
+
+   vec2 np = normalize(p.xz);
+
+   float displacement = params.radius * max(
+       min(mod(abs(np.x),0.5), 0.5 - mod(abs(np.x), .5)),
+       min(mod(abs(np.y),0.5), 0.5 - mod(abs(np.y), .5))
+    );
+   return max(p.y, length(p.xz) - params.radius - displacement);
+
+}
+
+vec3 stemColor(sdfParams params, vec3 point) {
+    return vec3(0.1, 0.5, 0.1);
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -509,9 +531,10 @@ vec3 seedColor(sdfParams params, vec3 point) {
 float objectDistance(sdfParams params, vec3 point, float maxDistance) {
     //get distance from point on the ray to the object
     switch(params.sdfType) {
-        case 0: return sunSDF (params, point);
-        case 1: return seedsSDF (params, point);
+        case 0: return sunSDF    (params, point);
+        case 1: return seedsSDF  (params, point);
         case 2: return petalsSDF (params, point);
+        case 3: return stemSDF   (params, point);
     }
     return maxDistance;
 
@@ -538,12 +561,7 @@ float rayMarch(
         rayPos = origin + t * ray;
 
         //get distance from point on the ray to the object
-        switch(params.sdfType) {
-            case 0: distance = sunSDF (params, rayPos); break;
-            case 1: distance = seedsSDF (params, rayPos); break;
-            case 2: distance = petalsSDF (params, rayPos); break;
-            default: distance = maxT;
-        }
+        distance = objectDistance(params, rayPos, maxT);
 
         if(distance < closestDistance) {
              closestDistance = distance;
@@ -692,6 +710,7 @@ vec3 getTextureColor(sdfParams params, vec3 point) {
         case 0: return sunColor(params, point);
         case 1: return seedColor(params, point);
         case 2: return petalColor(params, point);
+        case 3: return stemColor(params, point);
     }
     return params.color;
 }
@@ -794,6 +813,10 @@ void initSdfs() {
     sdfs[0].radius = 3.0;
     sdfs[0].color = vec3(1.0, 1.0, 0.5);
 
+    sdfs[1].sdfType = 3;
+    sdfs[1].center = vec3(0.0, 0.0, 0.0);
+    sdfs[1].radius = 0.3;
+    sdfs[1].color = vec3(1.0, 1.0, 0.5);
 
     vec3 flowerCenter;
     mat3 flowerRotation;
@@ -814,28 +837,35 @@ void initSdfs() {
         }
 
         //seeds
-        sdfs[i*3 + 1].sdfType = 1;
-        sdfs[i*3 + 1].center = flowerCenter;
-        sdfs[i*3 + 1].radius = 1.0;
-        sdfs[i*3 + 1].color = vec3(0.0, 0.0, 1.0);
-        sdfs[i*3 + 1].rotation = flowerRotation;
+        sdfs[i*4 + 1].sdfType = 1;
+        sdfs[i*4 + 1].center = flowerCenter;
+        sdfs[i*4 + 1].radius = 1.0;
+        sdfs[i*4 + 1].color = vec3(0.0, 0.0, 1.0);
+        sdfs[i*4 + 1].rotation = flowerRotation;
 
 
         //row of petals
-        sdfs[i*3 + 2].sdfType = 2;
-        sdfs[i*3 + 2].center = flowerCenter;
-        sdfs[i*3 + 2].radius = 1.0;
-        sdfs[i*3 + 2].color = vec3(1.0, 1.0, 0.0);
-        sdfs[i*3 + 2].extraVec3Val = vec3(0.5,0.1,0.005);
-        sdfs[i*3 + 2].rotation = flowerRotation;
+        sdfs[i*4 + 2].sdfType = 2;
+        sdfs[i*4 + 2].center = flowerCenter;
+        sdfs[i*4 + 2].radius = 1.0;
+        sdfs[i*4 + 2].color = vec3(1.0, 1.0, 0.0);
+        sdfs[i*4 + 2].extraVec3Val = vec3(0.5,0.1,0.005);
+        sdfs[i*4 + 2].rotation = flowerRotation;
 
         //2nd row of petals
-        sdfs[i*3 + 3].sdfType = 2;
-        sdfs[i*3 + 3].center = flowerCenter + flowerRotation * vec3(0.0, 0.0, -0.1);
-        sdfs[i*3 + 3].radius = 1.0;
-        sdfs[i*3 + 3].color = vec3(1.0, 1.0, 0.0);
-        sdfs[i*3 + 3].extraVec3Val = vec3(0.5,0.1,0.005);
-        sdfs[i*3 + 3].rotation = rotateZ(pi/4.0) * flowerRotation;
+        sdfs[i*4 + 3].sdfType = 2;
+        sdfs[i*4 + 3].center = flowerCenter + flowerRotation * vec3(0.0, 0.0, -0.1);
+        sdfs[i*4 + 3].radius = 1.0;
+        sdfs[i*4 + 3].color = vec3(1.0, 1.0, 0.0);
+        sdfs[i*4 + 3].extraVec3Val = vec3(0.5,0.1,0.005);
+        sdfs[i*4 + 3].rotation = rotateZ(pi/4.0) * flowerRotation;
+
+        //stem
+        sdfs[i*4 + 4].sdfType = 3;
+        sdfs[i*4 + 4].center = flowerCenter + vec3(0.0, 0.0, -0.2);
+        sdfs[i*4 + 4].radius = 0.1;
+        sdfs[i*4 + 4].color = vec3(0.0, 0.0, 1.0);
+        sdfs[i*4 + 4].rotation = flowerRotation;
     }
 }
 
