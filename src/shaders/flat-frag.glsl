@@ -40,6 +40,12 @@ const float AMBIENT = 10.0;
 
 
 float sunSpeed = 1.0;
+float night;
+float noon;
+float sunset;
+float dawn;
+
+
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
 vec3 v3Ref = vec3(0.0, 0.0, 0.0);
 vec3 v3Eye = vec3(0.0, 0.0, 4.0);
@@ -249,69 +255,35 @@ vec3 skyColor() {
       vec3 sunsetMid = vec3(0.909, 0.450, 0.262);
       vec3 sunsetZenith = vec3(0.007, 0.009, 0.3);
 
-      vec3 morningHorizon = vec3(0.323, 0.225, 0.127);
-      vec3 morningMid = vec3(0.209, 0.150, 0.262);
-      vec3 morningZenith = vec3(0.007, 0.009, 0.3);
+      vec3 dawnHorizon = vec3(0.323, 0.225, 0.127);
+      vec3 dawnMid = vec3(0.209, 0.150, 0.262);
+      vec3 dawnZenith = vec3(0.007, 0.009, 0.3);
       float blend;
 
-      //night
-      if(hour >= 19.0 || hour < 5.0) {
-          horizonColor =  nightHorizon;
-          midColor =  nightMid;
-          zenithColor = nightZenith;
-      }
 
-      //night to dawn
-      if(hour >= 5.0 && hour < 7.0) {
-          blend = (hour- 5.0) / 2.0;
-          horizonColor = mix(nightHorizon, morningHorizon, blend);
-          midColor     = mix(nightMid,     morningMid,     blend);
-          zenithColor  = mix(nightZenith,  morningZenith,  blend);
-      }
+      horizonColor = nightHorizon  * night
+                   + dawnHorizon   * dawn
+                   + noonHorizon   * noon
+                   + sunsetHorizon * sunset;
 
-      //dawn to noon
-      if(hour >= 7.0 && hour < 10.0) {
-          blend = (hour- 7.0) / 3.0;
-          horizonColor = mix(morningHorizon, noonHorizon, blend);
-          midColor     = mix(morningMid,     noonMid,     blend);
-          zenithColor  = mix(morningZenith,  noonZenith,  blend);
-      }
-      //noon
-      else if(hour >= 10.0 && hour < 15.0) {
-          horizonColor = noonHorizon;
-          midColor = noonMid;
-          zenithColor = noonZenith;
-      }
+      midColor     = nightMid  * night
+                   + dawnMid   * dawn
+                   + noonMid   * noon
+                   + sunsetMid * sunset;
 
-      //noon to sunset
-      else if(hour >= 15.0 && hour < 17.0) {
-          blend = (hour- 15.0) / 2.0;
-          horizonColor = mix(noonHorizon, sunsetHorizon, blend);
-          midColor = mix(noonMid, sunsetMid,             blend);
-          zenithColor = mix(noonZenith, sunsetZenith,    blend);
-      }
-
-      //sunset to night
-      else if(hour >= 17.0 && hour < 19.0) {
-          horizonColor = mix(sunsetHorizon, nightHorizon, (hour - 17.0) / 2.0);
-          midColor = mix(sunsetMid, nightMid, (hour - 17.0) / 2.0);
-          zenithColor = mix(sunsetZenith, nightZenith, (hour - 17.0) / 2.0);
-      }
+      zenithColor  = nightZenith  * night
+                   + dawnZenith   * dawn
+                   + noonZenith  * noon
+                   + sunsetZenith* sunset;
 
 
 
-      if(mainRay.y < 0.3) {
-          color = mix(horizonColor, midColor, mainRay.y * 3.333);
+      if(mainRay.y < 0.25) {
+          color = mix(horizonColor, midColor, mainRay.y * 4.0);
       }
       else {
-          color = mix(midColor, zenithColor, (mainRay.y - 0.3) * 6.6667);
+          color = mix(midColor, zenithColor, (mainRay.y - 0.25) *1.333);
       }
-      //color =
-
-
-      //add a bloom around the sun
-      //color = color * pow(clamp(5.0 - sunBloomDistance, 1.0, 5.0), 1.5);
-
       return color;
 
 }
@@ -319,34 +291,21 @@ vec3 skyColor() {
 
 vec3 landColor() {
 
-    vec3 dawn = vec3(0.0, 0.1, 0.0);
-    vec3 noon = vec3(0.0, 0.2, 0.0);
-    vec3 dusk = vec3(0.0, 0.1, 0.0);
-    vec3 night = vec3(0.0, 0.05, 0.0);
+    float noise = fbm2to1(v2ScreenPos*2.0, vec2(1.0,2.0));
+    vec3 base = vec3(0.180, 0.356, 0.039);
+
+    float noonIntensity = 1.5;
+    float sunsetIntensity = 0.5;
+    float nightIntensity = 0.03;
+    float dawnIntensity = 0.5;
 
 
-    return dawn * fbm2to1(v2ScreenPos*4.0, vec2(1.0,2.0));
-    //night
-    if(sunPosition.y < 0.0) return night*horizonHeight();
-    //noon
-    if(sunPosition.y > 8.0) return noon*horizonHeight();
-
-    //transition to dawn
-    if(sunPosition.x < 0.0 && sunPosition.y < 4.0) {
-        return mix(night, dawn, sunPosition.y / 4.0);
-    }
-    //transition to noon
-    if(sunPosition.x < 0.0 && sunPosition.y > 4.0) {
-        return mix(dawn, noon, (sunPosition.y-4.0) / 4.0);
-    }
-    //transition to dusk;
-    if(sunPosition.x > 0.0 && sunPosition.y > 2.0) {
-        return mix(dusk, noon, (sunPosition.y-2.0) / 6.0);
-    }
-    //transition to dusk;
-    if(sunPosition.x > 0.0 && sunPosition.y < 2.0) {
-        return mix(night, dusk, sunPosition.y/ 2.0);
-    }
+    return noise * base * (
+        noon * noonIntensity
+        + sunset * sunsetIntensity
+        + night * nightIntensity
+        + dawn * dawnIntensity
+    );
 
 }
 
@@ -777,6 +736,7 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfInde
 
 
 
+
     //make sun redder at sunrise/sunset
     if(hour < 8.0)  {
         sunColor.r = sunColor.r + (8.0 - hour)/4.0;
@@ -875,13 +835,56 @@ void initSdfs() {
 ////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// Lighting ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
-void initLighting() {
+void initTiming() {
     float time = 400.0;
     time = iTime;
     hour = mod(6.0 + 12.0 * time * sunSpeed * timeScale / pi, 24.0);
     sunPosition = sunOrbit * vec3(cos(time * sunSpeed *timeScale)/2.5,
                        sin(time * sunSpeed * timeScale),
                        cos(time * sunSpeed * timeScale)/2.0);
+    ///night
+    if(hour >= 19.0 || hour < 5.0) {
+        night  = 1.0;
+        dawn   = 0.0;
+        noon   = 0.0;
+        sunset = 0.0;
+   }
+   //night to dawn
+    if(hour >= 5.0 && hour < 7.0) {
+        night  = (7.0 - hour) / 2.0;
+        dawn   = (hour - 5.0) / 2.0;
+        noon   = 0.0;
+        sunset = 0.0;
+    }
+   //dawn to noo
+    if(hour >= 7.0 && hour < 10.0) {
+        night  = 0.0;
+        dawn   = (10.0 - hour) / 3.0;
+        noon   = (hour - 7.0) / 3.0;
+        sunset = 0.0;
+    }
+    //noon
+    if(hour >= 10.0 && hour < 15.0) {
+        night  = 0.0;
+        dawn   = 0.0;
+        noon   = 1.0;
+        sunset = 0.0;
+   }
+   //noon to sunset
+    if(hour >= 15.0 && hour < 17.0) {
+        night  = 0.0;
+        dawn   = 0.0;
+        noon   = (17.0 - hour) / 2.0;
+        sunset = (hour - 15.0) / 2.0;
+    }
+    //sunset to evening
+    if(hour >= 17.0 && hour < 19.0) {
+        night  = (hour - 17.0) / 2.0;
+        dawn   = 0.0;
+        noon   = 0.0;
+        sunset = (19.0 - hour) / 2.0;
+    }
+
 }
 
 
@@ -890,7 +893,7 @@ void initLighting() {
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     v2ScreenPos = pixelToScreenPos(fragCoord);
-    initLighting();
+    initTiming();
     vec3 normal;
 
     //set up
