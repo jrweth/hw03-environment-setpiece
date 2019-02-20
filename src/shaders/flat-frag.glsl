@@ -299,7 +299,7 @@ vec3 landColor() {
     float noise = fbm2to1(adjustedPos*70.0, vec2(1.0,2.0));
     float noise2= fbm2to1(adjustedPos*5.0, vec2(1.0,2.0));
     vec3 grass = vec3(0.180, 0.356, 0.039);
-    vec3 dirt = vec3(0.478, 0.290, 0.023);
+    vec3 dirt = vec3(0.878, 0.733, 0.141);
     vec3 base = mix(grass, dirt, noise) * noise2;
 
     float noonIntensity = 1.5;
@@ -842,7 +842,7 @@ void initSdfs() {
 ////////////////////////////////////////////////////////////////////////////////////////////
 void initTiming() {
     float time = 372.0;
-    time = 300.0;
+    //time = 300.0;
     time = iTime;
     hour = mod(6.0 + 12.0 * time * sunSpeed * timeScale / pi, 24.0);
     sunPosition = sunOrbit * vec3(cos(time * sunSpeed *timeScale)/3.9,
@@ -903,7 +903,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 
     //adjust camera position
-    camChange = smoothstep(0.0, 1.0, abs(12.0-hour)/12.0);
+    camChange = smoothstep(0.0, 1.0, abs(12.0-(mod(hour+3.0, 24.0)))/12.0);
     v3Eye.z = 4.0 - camChange;
     v3Eye.x = camChange;
 
@@ -947,9 +947,9 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         float sunT = rayMarch(sdfs[0], mainRay, v3Eye, 100, 0.0, sunOrbit, sunClosestDistance, minClosestT);
         float sunBloom = 0.0;
         if(sunT < sunOrbit || sunClosestDistance < 0.1) {
-            sunBloom = 1.0;
+            sunBloom = 1000.0;
         }
-        fragColor = vec4(color, sunBloom);
+        fragColor = vec4(color, t + sunBloom);
     }
     else {
         fragColor = vec4(color, 1.0);
@@ -961,7 +961,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 void main() {
     //need to convert to pixel dimesions
     shaderToy = false;
-    sunSpeed = 5.0;
+    sunSpeed = 3.0;
     vec2 fragCoord = screenToPixelPos(fs_Pos);
     v3Eye = u_Eye;
     mainImage(out_Col, fragCoord);
