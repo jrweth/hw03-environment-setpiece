@@ -888,6 +888,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     }
 
     //gamma correction
+    color = max(color, 0.0);
     fragColor = vec4(pow(color, vec3(1.0/2.2)), 1.0);
 
 
