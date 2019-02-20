@@ -780,7 +780,7 @@ void initSdfs() {
     for(int i = 0; i < numFlowers; i++) {
         switch (i) {
             case 0:
-                flowerCenter = vec3(0.3, -0.5, 1.0);
+                flowerCenter = vec3(0.7, -0.5, 1.0);
                 flowerRotation = rotateY(pi/8.0);
                 break;
             case 1:
