@@ -39,7 +39,7 @@ const float AMBIENT = 10.0;
 #define ATTENUATION 0
 
 
-float sunSpeed = 9.0;
+float sunSpeed = 1.0;
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
 vec3 v3Ref = vec3(0.0, 0.0, 0.0);
 vec3 v3Eye = vec3(0.0, 0.0, 4.0);
@@ -738,8 +738,8 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfInde
     float skyIntensity = clamp(0.5 + 0.5*normal.y, 0.0, 1.0);
 
     //decrease skyintesity at night
-    if(hour > 18.0) {
-        skyIntensity = clamp(pow((1.0 - (hour - 18.0)/6.0), 4.0), 0.1, 1.0)  * skyIntensity;
+    if(hour > 17.0) {
+        skyIntensity = clamp(pow((1.0 - (hour - 17.0)/7.0), 4.0), 0.1, 1.0)  * skyIntensity;
     }
     if(hour < 6.0) {
         skyIntensity = clamp(pow((1.0 - (6.0-hour)/6.0), 4.0), 0.1, 1.0)  * skyIntensity;
