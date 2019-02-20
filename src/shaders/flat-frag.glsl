@@ -20,6 +20,11 @@ const float sceneRadius = 100.0;
 const float distanceThreshold = 0.001;
 const int numFlowers = 3;
 const int numObjects = 10; //should be num flowers * 3 + 1
+const float timeScale = 0.005;
+
+const float sunOrbit = 80.0;
+const float horizon = 0.0;
+const float midSky = 15.0;
 
 
 // The larger the DISTORTION, the smaller the glow
@@ -34,12 +39,15 @@ const float AMBIENT = 10.0;
 #define ATTENUATION 0
 
 
-float sunSpeed = 1.0;
+float sunSpeed = 9.0;
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
 vec3 v3Ref = vec3(0.0, 0.0, 0.0);
 vec3 v3Eye = vec3(0.0, 0.0, 4.0);
-vec2 v2ScreenPos;
 vec3 sunPosition = vec3(5.0,10.0,10.0);
+
+vec3 mainRay;
+vec2 v2ScreenPos;
+float hour;
 float sunBloomDistance;        //the distance of the ray from teh sun in the sky
 float pi = 3.14159;
 struct sdfParams {
@@ -218,45 +226,90 @@ vec3 opCheapBendZY(in vec3 p )
 ////////////////////////////////////////// Background  ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 float horizonHeight() {
-     return 0.2;
+     return 0.0;
 }
 
 vec3 skyColor() {
 
       vec3 color;
-      vec3 dawn = vec3(0.2, 0.2, 0.3);
-      vec3 noon = vec3(0.04, 0.04, 0.8);
-      vec3 dusk = vec3(0.1, 0.1, 0.2);
-      vec3 night = vec3(0, 0, 0.05);
+      vec3 horizonColor;
+      vec3 midColor;
+      vec3 zenithColor;
 
+      vec3 nightHorizon = vec3(0.107, 0.127, 0.468);
+      vec3 nightMid = vec3(0.030, 0.031, 0.3);
+      vec3 nightZenith = vec3(0.002, 0.005, 0.2);
+
+      vec3 noonHorizon = vec3(0.137, 0.227, 0.568);
+      vec3 noonMid = vec3(0.050, 0.071, 0.7);
+      vec3 noonZenith = vec3(0.007, 0.009, 1.0);
+
+      vec3 sunsetHorizon = vec3(0.823, 0.325, 0.227);
+      vec3 sunsetMid = vec3(0.909, 0.450, 0.262);
+      vec3 sunsetZenith = vec3(0.007, 0.009, 0.3);
+
+      vec3 morningHorizon = vec3(0.323, 0.225, 0.127);
+      vec3 morningMid = vec3(0.209, 0.150, 0.262);
+      vec3 morningZenith = vec3(0.007, 0.009, 0.3);
+      float blend;
 
       //night
-      if(sunPosition.y < -20.0) {
-          color = night;
+      if(hour >= 19.0 || hour < 5.0) {
+          horizonColor =  nightHorizon;
+          midColor =  nightMid;
+          zenithColor = nightZenith;
+      }
+
+      //night to dawn
+      if(hour >= 5.0 && hour < 7.0) {
+          blend = (hour- 5.0) / 2.0;
+          horizonColor = mix(nightHorizon, morningHorizon, blend);
+          midColor     = mix(nightMid,     morningMid,     blend);
+          zenithColor  = mix(nightZenith,  morningZenith,  blend);
+      }
+
+      //dawn to noon
+      if(hour >= 7.0 && hour < 10.0) {
+          blend = (hour- 7.0) / 3.0;
+          horizonColor = mix(morningHorizon, noonHorizon, blend);
+          midColor     = mix(morningMid,     noonMid,     blend);
+          zenithColor  = mix(morningZenith,  noonZenith,  blend);
       }
       //noon
-      else if(sunPosition.y > 40.0) {color = noon;}
+      else if(hour >= 10.0 && hour < 15.0) {
+          horizonColor = noonHorizon;
+          midColor = noonMid;
+          zenithColor = noonZenith;
+      }
 
-      //transition to dawn
-      else if(sunPosition.x < 0.0 && sunPosition.y < 0.0) {
-          color = mix(dawn, night, -sunPosition.y / 20.0);
+      //noon to sunset
+      else if(hour >= 15.0 && hour < 17.0) {
+          blend = (hour- 15.0) / 2.0;
+          horizonColor = mix(noonHorizon, sunsetHorizon, blend);
+          midColor = mix(noonMid, sunsetMid,             blend);
+          zenithColor = mix(noonZenith, sunsetZenith,    blend);
       }
-      //transition to noon
-      else if(sunPosition.x < 0.0 && sunPosition.y > 0.0) {
-          color = mix(dawn, noon, sunPosition.y / 40.0);
+
+      //sunset to night
+      else if(hour >= 17.0 && hour < 19.0) {
+          horizonColor = mix(sunsetHorizon, nightHorizon, (hour - 17.0) / 2.0);
+          midColor = mix(sunsetMid, nightMid, (hour - 17.0) / 2.0);
+          zenithColor = mix(sunsetZenith, nightZenith, (hour - 17.0) / 2.0);
       }
-      //transition to dusk;
-      else if(sunPosition.x > 0.0 && sunPosition.y > 0.0) {
-          color = mix(dawn, noon, sunPosition.y / 40.0);
+
+
+
+      if(mainRay.y < 0.3) {
+          color = mix(horizonColor, midColor, mainRay.y * 3.333);
       }
-      //transition to dusk;
-      else if(sunPosition.x > 0.0 && sunPosition.y < 0.0) {
-          color =  mix(dawn, night,  -sunPosition.y / 40.0);
+      else {
+          color = mix(midColor, zenithColor, (mainRay.y - 0.3) * 6.6667);
       }
+      //color =
 
 
       //add a bloom around the sun
-      color = color * pow(clamp(5.0 - sunBloomDistance, 1.0, 5.0), 1.5);
+      //color = color * pow(clamp(5.0 - sunBloomDistance, 1.0, 5.0), 1.5);
 
       return color;
 
@@ -596,7 +649,7 @@ float sunShadow(vec3 point, float k, int sdfIndex) {
     float minClosestT;
     int shadowingSdfIndex;
 
-    rayMarchWorld(point, ray, minT, sunDistance, -1, sdfIndex, t, minClosestDistance, minClosestT, shadowingSdfIndex);
+    rayMarchWorld(point, ray, minT, sunDistance, -1, -1, t, minClosestDistance, minClosestT, shadowingSdfIndex);
     if( t < sunDistance ) return 0.0;
 
     if(sdfIndex == 0) return 1.0;
@@ -656,16 +709,17 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfInde
     //get the soft shadow and subsurface amounts
     float shadow = sunShadow(point, 3.0, sdfIndex);
     float sunIntensity;
+
+
     if(dot(normal, sunDirection) >= 0.0) {
         sunIntensity = clamp(dot(normal, sunDirection), 0.0, 1.0) * shadow;
     }
     else {
         //get the glow for the petals
-//        if(false) {
         if(sdfs[sdfIndex].sdfType == 2 ) {
             sunIntensity = subsurface(-sunDirection, normal, normalize(point - v3Eye), 0.01);
 
-            //make subface only apply in in evening
+            //make subsurface only apply in in evening
             sunIntensity = sunIntensity * clamp(-sunPosition.z/80.0, 0.0, 1.0);
 
             //account for the shadows
@@ -677,28 +731,47 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfInde
     }
 
 
-    //get three light intensities
-    float skyIntensity = clamp(0.5 + 0.5*normal.y, 0.0, 1.0);
-    //float indirect = clamp(dot(normal, normalize(sunDirection * vec3(-1.0, 0.0, -1.0))), 0.0, 1.0);
-    float indirectIntensity = clamp(dot(normal, normalize(abs(sunDirection))), 0.0, 1.0);
-
-
-
     //make sun brighter at noon
     sunIntensity = sunIntensity * clamp(sunPosition.y/80.0, 0.0, 1.0);
 
+    //
+    float skyIntensity = clamp(0.5 + 0.5*normal.y, 0.0, 1.0);
 
-    //make sun redder at sunset
-    if(sunPosition.x > 0.0 && sunPosition.y < 35.0)  {
-        sunColor.r = sunColor.r + (35.0 - sunPosition.y)/25.0;
+    //decrease skyintesity at night
+    if(hour > 18.0) {
+        skyIntensity = clamp(pow((1.0 - (hour - 18.0)/6.0), 4.0), 0.1, 1.0)  * skyIntensity;
     }
-    if(sunPosition.y < 0.0) {
+    if(hour < 6.0) {
+        skyIntensity = clamp(pow((1.0 - (6.0-hour)/6.0), 4.0), 0.1, 1.0)  * skyIntensity;
+    }
+
+
+    float indirectIntensity = clamp(dot(normal, normalize(sunDirection * vec3(-1.0, 0.0, -1.0))), 0.0, 1.0);
+
+    //diminish indrect intensity at noon/midnight
+    indirectIntensity = pow(mix(indirectIntensity, 0.0, abs(6.0 - mod(hour, 12.0))/6.0), 3.0);
+
+    //diminish sky intensity at night
+
+
+
+
+
+    //make sun redder at sunrise/sunset
+    if(hour < 8.0)  {
+        sunColor.r = sunColor.r + (8.0 - hour)/4.0;
+    }
+    else if(hour > 16.0)  {
+        sunColor.r = sunColor.r + (hour - 16.0)/4.0;
+    }
+    if(hour < 5.0) {
        sunIntensity = 0.0;
     }
 
     vec3 intensity = sunIntensity*sunColor
-                    + skyIntensity * skyColor;
+                    + skyIntensity * skyColor
                     + indirectIntensity * indirectColor;
+
 
     color = color * intensity;
 
@@ -772,10 +845,10 @@ void initSdfs() {
 ////////////////////////////////////////// Lighting ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 void initLighting() {
-    float timeScale = 0.005;
-    float time = 600.0;
+    float time = 400.0;
     time = iTime;
-    sunPosition = 80.0 * vec3(cos(time * sunSpeed *timeScale)/2.5,
+    hour = mod(6.0 + 12.0 * time * sunSpeed * timeScale / pi, 24.0);
+    sunPosition = sunOrbit * vec3(cos(time * sunSpeed *timeScale)/2.5,
                        sin(time * sunSpeed * timeScale),
                        cos(time * sunSpeed * timeScale)/2.0);
 }
@@ -799,9 +872,9 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec3 point;
 
 
-    vec3 ray= getRay(v3Up, v3Eye, v3Ref, iResolution.x/iResolution.y, v2ScreenPos) ;
-    rayMarchWorld(v3Eye, ray, 0.1, sceneRadius, -1, -1, t, minClosestDistance, minClosestT, sdfIndex);
-    point = v3Eye + ray * t;
+    mainRay= getRay(v3Up, v3Eye, v3Ref, iResolution.x/iResolution.y, v2ScreenPos) ;
+    rayMarchWorld(v3Eye, mainRay, 0.1, sceneRadius, -1, -1, t, minClosestDistance, minClosestT, sdfIndex);
+    point = v3Eye + mainRay * t;
 
     vec3 color = backgroundColor();
 
