@@ -226,7 +226,8 @@ vec3 opCheapBendZY(in vec3 p )
 ////////////////////////////////////////// Background  ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 float horizonHeight() {
-     return 0.0;
+     float displacement = fbm2to1(v2ScreenPos, vec2(3.33, 3.2343)) - 0.4;
+     return displacement;
 }
 
 vec3 skyColor() {
@@ -315,6 +316,7 @@ vec3 skyColor() {
 
 }
 
+
 vec3 landColor() {
 
     vec3 dawn = vec3(0.0, 0.1, 0.0);
@@ -323,10 +325,11 @@ vec3 landColor() {
     vec3 night = vec3(0.0, 0.05, 0.0);
 
 
+    return dawn * fbm2to1(v2ScreenPos*4.0, vec2(1.0,2.0));
     //night
-    if(sunPosition.y < 0.0) return night;
+    if(sunPosition.y < 0.0) return night*horizonHeight();
     //noon
-    if(sunPosition.y > 8.0) return noon;
+    if(sunPosition.y > 8.0) return noon*horizonHeight();
 
     //transition to dawn
     if(sunPosition.x < 0.0 && sunPosition.y < 4.0) {
@@ -348,6 +351,7 @@ vec3 landColor() {
 }
 
 vec3 backgroundColor() {
+
 
     if(v2ScreenPos.y < horizonHeight()) {
         return landColor();
@@ -820,15 +824,15 @@ void initSdfs() {
     for(int i = 0; i < numFlowers; i++) {
         switch (i) {
             case 0:
-                flowerCenter = vec3(0.3, 0.0, 1.0);
+                flowerCenter = vec3(0.3, -0.5, 1.0);
                 flowerRotation = rotateY(pi/8.0);
                 break;
             case 1:
-                 flowerCenter = vec3(-2.0, 0.0, -2.0);
+                 flowerCenter = vec3(-2.0, -0.2, -2.0);
                  flowerRotation = rotateY(-pi/6.0);
                 break;
             case 2:
-                flowerCenter = vec3(-1.1, 2.2, -3.0);
+                flowerCenter = vec3(-1.1, 2.0, -3.0);
                 flowerRotation = rotateY(0.0);
                 break;
         }
