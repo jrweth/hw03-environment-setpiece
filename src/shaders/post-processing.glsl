@@ -1,8 +1,10 @@
 
 const int  samples    = 15;  // must be odd
 const int  samplesHalf = samples / 2;
-const float focalLength = 1.2;
-const float focalRange = 0.15;
+
+float focalLength = 3.2;
+float focalRange = 0.2;
+float sigma = 3.0;
 
 
 float Gaussian (float sigma, float x)
@@ -23,10 +25,12 @@ vec3 BlurredPixel (in vec2 uv) {
     float total = 0.0;
     for(int xi = -samplesHalf; xi <= samplesHalf; xi++) {
         float x = clamp(uv.x + float(xi)*len, 0.0, 1.0);
+        float gx = Gaussian(sigma, x);
         for(int yi = -samplesHalf; yi <= samplesHalf; yi++) {
             float y = clamp(uv.y + float(yi)*len, 0.0, 1.0);
-            ret += texture(iChannel0, vec2(x,y)).rgb;
-            total++;
+            float gy = Gaussian(sigma, y);
+            ret += texture(iChannel0, vec2(x,y)).rgb * gx * gy;
+            total += gx * gy;;
         }
     }
     //ret = texture(iChannel0, uv).rgb;
@@ -43,6 +47,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec2 uv = fragCoord/iResolution.xy;
     vec3 color = texture(iChannel0, uv).rgb;
 
+    //focalLength = 4.4 + sin(iTime)* 1.8;
  	//uv = fragCoord.xy / iResolution.x;
 	vec3 blurredColor = BlurredPixel(uv);
 
