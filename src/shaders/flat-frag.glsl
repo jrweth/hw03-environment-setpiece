@@ -26,11 +26,12 @@ const float sunOrbit = 80.0;
 const float horizon = 0.0;
 const float midSky = 15.0;
 
-float sunSpeed = 5.0;
+float sunSpeed = 9.0;
 float night;
 float noon;
 float sunset;
 float dawn;
+float camChange;
 
 
 vec3 v3Up = vec3(0.0, 1.0, 0.0);
@@ -233,8 +234,9 @@ vec3 opCheapBendZY(in vec3 p )
 ////////////////////////////////////////// Background  ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 float horizonHeight() {
-     float displacement = fbm2to1(v2ScreenPos, vec2(3.33, 3.2343)) - 0.4;
-     return displacement;
+    vec2 adjustedPos = vec2(v2ScreenPos.x - camChange*0.5, 0.0);
+    float displacement = fbm2to1(adjustedPos, vec2(3.33, 3.2343))*1.3 - .75;
+    return displacement;
 }
 
 vec3 skyColor() {
@@ -292,8 +294,13 @@ vec3 skyColor() {
 
 vec3 landColor() {
 
-    float noise = fbm2to1(v2ScreenPos*2.0, vec2(1.0,2.0));
-    vec3 base = vec3(0.180, 0.356, 0.039);
+    vec2 adjustedPos = v2ScreenPos;
+    adjustedPos.x -= camChange*0.5;
+    float noise = fbm2to1(adjustedPos*70.0, vec2(1.0,2.0));
+    float noise2= fbm2to1(adjustedPos*5.0, vec2(1.0,2.0));
+    vec3 grass = vec3(0.180, 0.356, 0.039);
+    vec3 dirt = vec3(0.478, 0.290, 0.023);
+    vec3 base = mix(grass, dirt, noise) * noise2;
 
     float noonIntensity = 1.5;
     float sunsetIntensity = 0.5;
@@ -471,7 +478,7 @@ float stemSDF(sdfParams params, vec3 point) {
    vec3 p = params.rotation * (point - params.center);
 
    //adjust a bit
-   p.x +=  params.radius * sin(p.y * 0.3)/0.2;
+   p.x +=  params.radius * sin(p.y ) * 2.0;
 
    vec2 np = normalize(p.xz);
 
@@ -760,7 +767,7 @@ void initSdfs() {
     //sun
     sdfs[0].sdfType = 0;
     sdfs[0].center = sunPosition;
-    sdfs[0].radius = 3.0;
+    sdfs[0].radius = 6.0;
     sdfs[0].color = vec3(1.0, 1.0, 0.5);
 
     sdfs[1].sdfType = 3;
@@ -834,10 +841,11 @@ void initSdfs() {
 ////////////////////////////////////////// Lighting ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 void initTiming() {
-    float time = 400.0;
+    float time = 372.0;
+    time = 300.0;
     time = iTime;
     hour = mod(6.0 + 12.0 * time * sunSpeed * timeScale / pi, 24.0);
-    sunPosition = sunOrbit * vec3(cos(time * sunSpeed *timeScale)/2.5,
+    sunPosition = sunOrbit * vec3(cos(time * sunSpeed *timeScale)/3.9,
                        sin(time * sunSpeed * timeScale),
                        cos(time * sunSpeed * timeScale)/2.0);
     ///night
@@ -895,7 +903,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 
     //adjust camera position
-    float camChange = smoothstep(0.0, 1.0, abs(12.0-hour)/12.0);
+    camChange = smoothstep(0.0, 1.0, abs(12.0-hour)/12.0);
     v3Eye.z = 4.0 - camChange;
     v3Eye.x = camChange;
 
@@ -928,13 +936,23 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         }
     }
 
+
     //gamma correction
     color = max(color, 0.0);
+    color = pow(color, vec3(1.0/2.2));
+
     if(shaderToy) {
-        fragColor = vec4(pow(color, vec3(1.0/2.2)), t);
+        //get the sun bloom
+        float sunClosestDistance;
+        float sunT = rayMarch(sdfs[0], mainRay, v3Eye, 100, 0.0, sunOrbit, sunClosestDistance, minClosestT);
+        float sunBloom = 0.0;
+        if(sunT < sunOrbit || sunClosestDistance < 0.1) {
+            sunBloom = 1.0;
+        }
+        fragColor = vec4(color, sunBloom);
     }
     else {
-        fragColor = vec4(pow(color, vec3(1.0/2.2)), 1.0);
+        fragColor = vec4(color, 1.0);
     }
 
 
@@ -942,9 +960,10 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 void main() {
     //need to convert to pixel dimesions
+    shaderToy = false;
+    sunSpeed = 5.0;
     vec2 fragCoord = screenToPixelPos(fs_Pos);
     v3Eye = u_Eye;
     mainImage(out_Col, fragCoord);
-    shaderToy = false;
 }
 
