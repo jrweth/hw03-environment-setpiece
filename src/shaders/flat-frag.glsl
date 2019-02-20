@@ -504,17 +504,14 @@ vec3 seedColor(sdfParams params, vec3 point) {
 ////////////////////////////////////////// Stem ////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////
 float stemSDF(sdfParams params, vec3 point) {
-   vec3 p = point - params.center;
+   vec3 p = params.rotation * (point - params.center);
 
    //adjust a bit
-   p.x +=  params.radius * sin(point.y * 0.3)/0.2;
+   p.x +=  params.radius * sin(p.y * 0.3)/0.2;
 
    vec2 np = normalize(p.xz);
 
-   float displacement = params.radius * max(
-       min(mod(abs(np.x),0.5), 0.5 - mod(abs(np.x), .5)),
-       min(mod(abs(np.y),0.5), 0.5 - mod(abs(np.y), .5))
-    );
+   float displacement = params.radius * abs(cos(np.x * 2.0 * pi));
    return max(p.y, length(p.xz) - params.radius - displacement);
 
 }
@@ -863,7 +860,7 @@ void initSdfs() {
         //stem
         sdfs[i*4 + 4].sdfType = 3;
         sdfs[i*4 + 4].center = flowerCenter + vec3(0.0, 0.0, -0.2);
-        sdfs[i*4 + 4].radius = 0.1;
+        sdfs[i*4 + 4].radius = 0.05;
         sdfs[i*4 + 4].color = vec3(0.0, 0.0, 1.0);
         sdfs[i*4 + 4].rotation = flowerRotation;
     }
