@@ -2,7 +2,9 @@
 
 ## CIS 566 Homework 3: Environment Setpiece
 
-## Seed Patter
+## Seed Pattern
+
+The seed pattern 
 ![](images/seed_pattern.png)
 
 ## Seed Height and Color
@@ -18,9 +20,15 @@
 ![](images/soft_shadow.png)
 ## Depth of Field
 ![](images/depth_field.png)
-## Background Sky
-![](images/background.png)
 ## Land Texture
+![](images/land.png)
+
+## Background Sky
+![](images/dawn.png)
+![](images/sunset.png)
+![](images/night.png)
+
+
 ## Sun Bloom
 ![](images/bloom.png)
 

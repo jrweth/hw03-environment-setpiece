@@ -44,28 +44,28 @@ void setFocalLength() {
     float flower3 = 6.2;
 
     //first flower
-    if(mod(iTime, cycleLength) < 20.0) {
+    if(mod(iTime, cycleLength) < 25.0) {
         focalLength = flower1;
     }
     //first to second
-    else if(mod(iTime, cycleLength) < 30.0) {
-        focalLength = mix(flower1, flower2, (iTime - 20.0)/10.0);
+    else if(mod(iTime, cycleLength) < 26.0) {
+        focalLength = mix(flower1, flower2, iTime - 25.0);
     }
     //second flower
-    else if(mod(iTime, cycleLength) < 40.0) {
+    else if(mod(iTime, cycleLength) < 45.0) {
         focalLength = flower2;
     }
     //second to third
-    else if(mod(iTime, cycleLength) < 50.0) {
-        focalLength = mix(flower2, flower3, (iTime - 40.0)/10.0);
+    else if(mod(iTime, cycleLength) < 46.0) {
+        focalLength = mix(flower2, flower3, iTime - 45.0);
     }
     //third
     else if(mod(iTime, cycleLength) < 80.0) {
         focalLength = flower3;
     }
     //third back to first
-    else if(mod(iTime, cycleLength) < 100.0) {
-        focalLength = mix(flower3, flower1, (iTime - 80.0)/20.0);
+    else if(mod(iTime, cycleLength) < 81.0) {
+        focalLength = mix(flower3, flower1, iTime - 80.0);
     }
     //fist again
     else {
@@ -97,13 +97,13 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
     //fragColor = vec4(color, 1.0);
     if(bloom) {
-        color = BlurredPixel(uv, 0.3/iResolution.x);
+        color = BlurredPixel(uv, 0.5/iResolution.x);
     }
     else if(abs(distance - focalLength) > focalRange) {
-        float len = clamp(distance / 20.0, 0.0, 0.3)/iResolution.x;
+        float len = clamp(distance / 10.0, 0.0, 0.7)/iResolution.x;
         color = BlurredPixel(uv, len);
     }
 
-    fragColor = vec4(color, 1.0);
+    fragColor = vec4(max(color,0.0), 1.0);
 
 }
