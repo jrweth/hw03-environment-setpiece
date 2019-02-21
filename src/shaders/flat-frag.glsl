@@ -411,11 +411,11 @@ vec3 petalColor(sdfParams params, vec3 point) {
     }
     else if(percent < 0.2) {
         color = mix(color2, color3, (percent - 0.1) * 10.0);
-        color = mix(color, stripedColor, pow(percent, 2.0));
+        color = mix(color, stripedColor, pow(percent, 0.5));
     }
-    else if(percent < 0.4)  {
+    else if(percent < 0.8)  {
         color = mix(color3, color4, (percent - 0.2) * 5.0);
-        color = mix(color, stripedColor, pow(percent, 2.0));
+        color = mix(color, stripedColor, pow(percent, 0.5));
     }
     else {
         color = color4;
