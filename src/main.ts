@@ -81,7 +81,7 @@ function main() {
   function tick() {
     camera.update();
     stats.begin();
-    gl.viewport(0, 0, window.innerWidth, window.innerHeight);
+    gl.viewport(0, 0, 500, 300);
     renderer.clear();
     processKeyPresses();
     renderer.render(camera, flat, [
@@ -95,16 +95,16 @@ function main() {
   }
 
   window.addEventListener('resize', function() {
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    camera.setAspectRatio(window.innerWidth / window.innerHeight);
+    renderer.setSize(500, 300);
+    camera.setAspectRatio(500 / 300);
     camera.updateProjectionMatrix();
-    flat.setResolution(window.innerWidth, window.innerHeight);
+    flat.setResolution(500, 300);
   }, false);
 
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  camera.setAspectRatio(window.innerWidth / window.innerHeight);
+  renderer.setSize(500, 300);
+  camera.setAspectRatio(500 / 300);
   camera.updateProjectionMatrix();
-  flat.setResolution(window.innerWidth, window.innerHeight);
+  flat.setResolution(500, 300);
 
   // Start the render loop
   tick();
