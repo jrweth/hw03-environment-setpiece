@@ -404,7 +404,7 @@ vec3 petalColor(sdfParams params, vec3 point) {
 
 
     vec2 p = normalize(point.xy - params.center.xy);
-    float percent = (length(point - params.center) - 0.5);// / params.extraVec3Val.x;
+    float percent = (length(point - params.center) - 0.5) - random1(params.center.xy, vec2(1.0, 2.0)) * 0.2;// / params.extraVec3Val.x;
     vec3 stripedColor = mix(color2, color4, abs(sin(400.0*acos(p.x)/pi)));
     if(percent < 0.1) {
         color = mix(color1, color2, percent * 10.0);
