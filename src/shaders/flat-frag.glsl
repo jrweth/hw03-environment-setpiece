@@ -801,7 +801,7 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfInde
     float fireflyIntesnity = getFireFlyLightIntensity(point, normal, sdfIndex);
 
 
-    vec3 intensity = //sunIntensity*sunColor
+    vec3 intensity = sunIntensity*sunColor
                     + skyIntensity * skyColor
                     + indirectIntensity * indirectColor
                     + fireflyIntesnity * fireFlyColor;
@@ -948,11 +948,12 @@ void initTiming() {
         noon   = 0.0;
         sunset = (19.0 - hour) / 2.0;
     }
-
+/*
     night = 1.0;
     noon = 0.0;
     dawn = 0.0;
     sunset = 0.0;
+    */
 
 }
 
