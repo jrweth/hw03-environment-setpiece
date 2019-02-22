@@ -343,6 +343,56 @@ vec3 sunColor(sdfParams params, vec3 point) {
     return params.color;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////// FIREFLIES  ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+vec3 getFireFlyStartingPosition(int sdfIndex) {
+   float seedOffset = mod(float(sdfIndex) - 1.0, 4.0);
+   return sdfs[sdfIndex - int(seedOffset)].center;
+
+}
+
+vec3 getFireFlyPosition(int sdfIndex) {
+   if(night < 1.0) return vec3(1000.0, 1000.0, 1000.0);
+
+   vec3 startPos = getFireFlyStartingPosition(sdfIndex);
+   float freq = hour;
+   vec3 offset = sdfs[sdfIndex].rotation * (0.5 * vec3(sin(hour+float(sdfIndex)), cos(hour+float(sdfIndex)*2.0),   0.3));
+
+   return startPos + offset;
+
+}
+
+float getFireFlyLightedStatus(int sdfIndex) {
+    float freq = (hour+float(sdfIndex))*2.5;
+
+    //turn it off at night
+    if(night < 1.0) return 0.0;
+
+    if (sin(freq) > .5) {
+       return pow((sin(freq) - 0.5) * 2.0, 0.5);
+    }
+
+    return 0.0;
+
+}
+
+float getFireFlyLightIntensity(vec3 point, vec3 normal, int sdfIndex) {
+    vec3 fPosition = getFireFlyPosition(sdfIndex);
+
+    //diminish based upon distance
+    float distance = length(point - fPosition) * 2.0;
+    float intensity = 0.02 / (distance * distance);
+
+    //diminish based upon normal
+    vec3 fDirection = normalize(fPosition - point);
+    intensity = intensity * dot(normal, fDirection);
+
+    //diminish based upon lighted status
+    intensity = intensity * getFireFlyLightedStatus(sdfIndex);
+
+    return clamp(intensity, 0.0, 1.0);
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// PETALS  ////////////////////////////////////////
@@ -424,9 +474,6 @@ vec3 petalColor(sdfParams params, vec3 point) {
 
     return  color;
 }
-
-
-
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -687,6 +734,7 @@ vec3 getTextureColor(sdfParams params, vec3 point) {
 }
 
 
+
 void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfIndex) {
     vec3 direction;
     vec3 lightColor;
@@ -694,6 +742,7 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfInde
     vec3 sunColor = vec3(1.5, 1.25, 1.0);
     vec3 skyColor = vec3(0.08,0.10,0.14);
     vec3 indirectColor = vec3(0.04, 0.028, 0.020);
+    vec3 fireFlyColor = vec3(0.698, 0.956, 0.145);
 
 
     //get the soft shadow and subsurface amounts
@@ -726,7 +775,6 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfInde
 
     //
     float skyIntensity = clamp(0.5 + 0.5*normal.y, 0.0, 1.0);
-
     //decrease skyintesity at night
     if(hour > 17.0) {
         skyIntensity = clamp(pow((1.0 - (hour - 17.0)/7.0), 4.0), 0.1, 1.0)  * skyIntensity;
@@ -748,9 +796,15 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfInde
        sunIntensity = 0.0;
     }
 
-    vec3 intensity = sunIntensity*sunColor
+
+    //get firefly intensity
+    float fireflyIntesnity = getFireFlyLightIntensity(point, normal, sdfIndex);
+
+
+    vec3 intensity = //sunIntensity*sunColor
                     + skyIntensity * skyColor
-                    + indirectIntensity * indirectColor;
+                    + indirectIntensity * indirectColor
+                    + fireflyIntesnity * fireFlyColor;
 
 
     color = color * intensity;
@@ -846,7 +900,7 @@ void initSdfs() {
 ////////////////////////////////////////////////////////////////////////////////////////////
 void initTiming() {
     float time = 372.0;
-    time = 20.0;
+    //time = 20.0;
     time = iTime;
     hour = mod(6.0 + 12.0 * time * sunSpeed * timeScale / pi, 24.0);
     sunPosition = sunOrbit * vec3(cos(time * sunSpeed *timeScale)/3.9,
@@ -894,6 +948,11 @@ void initTiming() {
         noon   = 0.0;
         sunset = (19.0 - hour) / 2.0;
     }
+
+    night = 1.0;
+    noon = 0.0;
+    dawn = 0.0;
+    sunset = 0.0;
 
 }
 
