@@ -800,7 +800,7 @@ void initSdfs() {
                 break;
             case 4:
                 flowerCenter = vec3(-2.3, -0.5, 0.2);
-                flowerRotation = rotateY(-pi/4.0);
+                flowerRotation = rotateY(-pi/6.0);
                 break;
         }
 
@@ -845,7 +845,7 @@ void initSdfs() {
 ////////////////////////////////////////////////////////////////////////////////////////////
 void initTiming() {
     float time = 372.0;
-    time = 260.0;
+    time = 20.0;
     time = iTime;
     hour = mod(6.0 + 12.0 * time * sunSpeed * timeScale / pi, 24.0);
     sunPosition = sunOrbit * vec3(cos(time * sunSpeed *timeScale)/3.9,
