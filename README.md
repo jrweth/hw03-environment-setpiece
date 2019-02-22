@@ -67,6 +67,11 @@ Shadows were obtained by raymarching toward the sun and finding any occluding ob
 was also found in order to acheive soft-shadowing according to the technique used by Inigq Quirez 
 [here](http://www.iquilezles.org/www/articles/rmshadows/rmshadows.htm)).
 
+##Subsurface Scattering
+![](images/scattering.png)
+In order to simulate the light passing through the petals when the sun is behind them some subsurface scattering
+was used to create translucecy around the petal edges.
+
 ## Land Texture
 ![](images/land.png)
 

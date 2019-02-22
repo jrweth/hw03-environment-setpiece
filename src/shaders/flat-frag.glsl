@@ -40,15 +40,15 @@ vec3 v3Eye = vec3(0.0, 0.0, 4.0);
 vec3 sunPosition = vec3(5.0,10.0,10.0);
 
 // The larger the DISTORTION, the smaller the glow
-const float DISTORTION = 12.0;
+const float DISTORTION = 5.0;
 // The higher GLOW is, the smaller the glow of the subsurface scattering
-const float GLOW = 1.0;
+const float GLOW = 12.0;
 // The higher the BSSRDF_SCALE, the brighter the scattered light
-const float BSSRDF_SCALE = 1.0;
+const float BSSRDF_SCALE = 3.0;
 // Boost the shadowed areas in the subsurface glow with this
-const float AMBIENT = 10.0;
+const float AMBIENT = 5.0;
 // Toggle this to affect how easily the subsurface glow propagates through an object
-#define ATTENUATION 0
+#define ATTENUATION 1
 
 bool shaderToy = true;
 
@@ -651,7 +651,9 @@ float sunShadow(vec3 point, float k, int sdfIndex) {
 float subsurface(vec3 lightDir, vec3 normal, vec3 viewVec, float thinness) {
     vec3 scatteredLightDir = lightDir + normal * DISTORTION;
     float lightReachingEye = pow(clamp(dot(viewVec, -scatteredLightDir), 0.0, 1.0), GLOW) * BSSRDF_SCALE;
-	float totalLight = lightReachingEye;// * thinness;
+    float attenuation = max(0.0, dot(normal, lightDir) + dot( viewVec, - lightDir));
+
+	float totalLight = attenuation * (lightReachingEye + AMBIENT) * thinness;
 
 
     return totalLight;
@@ -704,7 +706,7 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfInde
     else {
         //get the glow for the petals
         if(sdfs[sdfIndex].sdfType == 2 ) {
-            sunIntensity = subsurface(-sunDirection, normal, normalize(point - v3Eye), 0.01);
+            sunIntensity = subsurface(-sunDirection, normal, normalize(point - v3Eye),1.0);
 
             //make subsurface only apply in in evening
             sunIntensity = sunIntensity * clamp(-sunPosition.z/sunOrbit, 0.0, 1.0);
@@ -732,11 +734,12 @@ void adjustColorForLights(inout vec3 color, vec3 normal, vec3 point, int sdfInde
         skyIntensity = clamp(pow((1.0 - (6.0-hour)/6.0), 4.0), 0.1, 1.0)  * skyIntensity;
     }
 
+    //vec3 indirectDirection = normalize(sunDirection * vec3(-1.0, 0.0, -1.0));
+    vec3 indirectDirection = normalize(vec3(0.2, 0.0, 1.0));
+    float indirectIntensity = clamp(dot(normal, indirectDirection), 0.0, 1.0);
 
-    float indirectIntensity = clamp(dot(normal, normalize(sunDirection * vec3(-1.0, 0.0, -1.0))), 0.0, 1.0);
-
-    //diminish indrect intensity at noon/midnight
-    indirectIntensity = pow(mix(indirectIntensity, 0.0, abs(6.0 - mod(hour, 12.0))/6.0), 3.0);
+    //tone down indirect at night
+    indirectIntensity = indirectIntensity * (1.0 - night);
 
     //make sun redder at sunrise/sunset
     sunColor.r = max(sunColor.r * 3.0 * (dawn*0.8 + sunset), sunColor.r);
@@ -842,7 +845,7 @@ void initSdfs() {
 ////////////////////////////////////////////////////////////////////////////////////////////
 void initTiming() {
     float time = 372.0;
-    //time = 300.0;
+    time = 260.0;
     time = iTime;
     hour = mod(6.0 + 12.0 * time * sunSpeed * timeScale / pi, 24.0);
     sunPosition = sunOrbit * vec3(cos(time * sunSpeed *timeScale)/3.9,
@@ -961,7 +964,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 void main() {
     //need to convert to pixel dimesions
     shaderToy = false;
-    sunSpeed = 3.0;
+    sunSpeed = 2.0;
     vec2 fragCoord = screenToPixelPos(fs_Pos);
     v3Eye = u_Eye;
     mainImage(out_Col, fragCoord);
