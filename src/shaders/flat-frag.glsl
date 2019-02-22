@@ -397,7 +397,7 @@ float petalsSDF(sdfParams params, vec3 point) {
 
 vec3 petalColor(sdfParams params, vec3 point) {
     vec3 color;
-    vec3 color1 = vec3(0.384, 0.082, 0.047);
+    vec3 color1 = vec3(0.284, 0.062, 0.037);
     vec3 color2 = vec3(0.635, 0.184, 0.035);
     vec3 color3 = vec3(0.996, 0.862, 0.141);
     vec3 color4 = vec3(1.0, 1.0, 0.4);
@@ -408,13 +408,14 @@ vec3 petalColor(sdfParams params, vec3 point) {
     vec3 stripedColor = mix(color2, color4, abs(sin(400.0*acos(p.x)/pi)));
     if(percent < 0.1) {
         color = mix(color1, color2, percent * 10.0);
+        color = mix(color, stripedColor, pow(percent, 0.5));
     }
     else if(percent < 0.2) {
         color = mix(color2, color3, (percent - 0.1) * 10.0);
         color = mix(color, stripedColor, pow(percent, 0.5));
     }
     else if(percent < 0.8)  {
-        color = mix(color3, color4, (percent - 0.2) * 5.0);
+        color = mix(color3, color4, (percent - 0.2) * 1.666);
         color = mix(color, stripedColor, pow(percent, 0.5));
     }
     else {
