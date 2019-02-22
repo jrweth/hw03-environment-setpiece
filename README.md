@@ -136,6 +136,10 @@ In the ShaderToy post processing step, if a pixel was specified as having a bloo
 blur to create the light bloom.
 
 
+## Fireflies
+![](images/fireflies.png)
 
+To add a litte more spice to the evening scene some roamin fireflies were added. At this point they are just point lights
+that light up the environment around them.  A further enhancement would be to create some sort of glowing body sdf.
 
 
