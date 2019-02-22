@@ -67,10 +67,11 @@ Shadows were obtained by raymarching toward the sun and finding any occluding ob
 was also found in order to acheive soft-shadowing according to the technique used by Inigq Quirez 
 [here](http://www.iquilezles.org/www/articles/rmshadows/rmshadows.htm)).
 
-##Subsurface Scattering
+## Subsurface Scattering
 ![](images/scattering.png)
+
 In order to simulate the light passing through the petals when the sun is behind them some subsurface scattering
-was used to create translucecy around the petal edges.
+was used to create translucency around the petal edges.
 
 ## Land Texture
 ![](images/land.png)
@@ -78,7 +79,8 @@ was used to create translucecy around the petal edges.
 There is no geometry associated with the land texture, but is simply a color applied to the background.
 To give it a bit more interest the height of the horizon (or mountain height) was acheived using 2d FBM.
 The color of the texture was created by mixing two different colors representing sand and brush and
-mixing them together using FBM.
+mixing them together using FBM.  Finally the land was given a bit more shape broadly by scaling the color
+up and down with FBM with a broader frequency.
 
 ## Background Sky
 ![](images/dawn.png)
