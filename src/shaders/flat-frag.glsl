@@ -787,11 +787,11 @@ void initSdfs() {
                 flowerRotation = rotateY(pi/8.0);
                 break;
             case 1:
-                 flowerCenter = vec3(-2.0, -0.0, -2.0);
+                 flowerCenter = vec3(-2.0, -0.001, -2.0);
                  flowerRotation = rotateY(-pi/6.0);
                 break;
             case 2:
-                flowerCenter = vec3(-1.1, 2.0, -3.0);
+                flowerCenter = vec3(-1.1, 2.02, -3.0);
                 flowerRotation = rotateY(0.0);
                 break;
             case 3:
