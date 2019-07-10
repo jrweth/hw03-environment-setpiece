@@ -18,8 +18,9 @@ In particular the following methods were employed:
 
 ## Demos
 The demos for this project can be found in two places
-- [With Post Processing on Shader Toy](https://www.shadertoy.com/view/tdSGWy)
-- [No post processing](https://jrweth.github.io/hw03-environment-setpiece/)  
+- [Rendered Demo](http://www.jrweth.com/wp-content/uploads/final.mp4)
+- [With Post Processing on Shader Toy](https://www.shadertoy.com/view/tdSGWy) (best viewed with Chrome)
+- [No post processing](https://jrweth.github.io/hw03-environment-setpiece/) (best viewed with Chrome) 
 
 
 
